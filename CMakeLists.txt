@@ -8,15 +8,13 @@ project(raft_cpp_impl
     VERSION 0.1
     LANGUAGES CXX)
 
-find_package(Boost REQUIRED)
+# setting this so compile_commands.json is generated for clangd
+set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
-# grabbing fmt lib because not sure if GCC or Clang support C++23 or 20 whichever adds fmt and don't care to investigate enough to be sure
-include(FetchContent)
-FetchContent_Declare(
-  fmtlib
-  GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-  GIT_TAG 5.3.0)
-FetchContent_MakeAvailable(fmtlib)
+
+find_package(Boost REQUIRED)
+# grabbing fmt lib because atm std::format and std::print support is a bit sketchy
+find_package(fmt REQUIRED)
 
 # lib src code
 add_subdirectory(src)
