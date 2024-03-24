@@ -1,0 +1,13 @@
+CMakeCache.txt
+CMakeFiles/
+_deps/
+*.a
+*.o
+Makefile
+raft_impl
+apps/cmake_install.cmake
+cmake_install.cmake
+src/cmake_install.cmake
+.ninja_deps
+.ninja_log
+build.ninja
