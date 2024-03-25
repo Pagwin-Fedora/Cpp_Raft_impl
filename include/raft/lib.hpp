@@ -1,9 +1,12 @@
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <iterator>
 #include <optional>
 #include <type_traits>
+#include <unordered_set>
 #include <utility>
+#include <variant>
 #include <vector>
 
 // on page 4 there's a 1 page reference sheet https://raft.github.io/raft.pdf
@@ -25,8 +28,36 @@ namespace raft{
         index_t idx;
         term_t term;
     };
+    enum mode{
+        follower,
+        candiate,
+        leader
+    };
+    class leader_status{
+        mode current_state;
 
-    template<typename Action>
+    };
+
+    enum io_action_variants{
+        send_log,
+        request_vote,
+        domain_action
+    };
+    template <typename Action, typename DomainAction>
+    class io_action{
+        static_assert(std::is_base_of_v<base_action, Action>(),"ActionType must inherit from base_action to ensure it has associated state");
+        io_action_variants variant;
+        std::vector<Action> send_log_val;
+        DomainAction domain_action_val;
+        id_t target;
+        public:
+        io_action_variants get_variant(){return this->variant;}
+        std::vector<Action> const& send_log(){return this->send_log_val;}
+        id_t const& get_target(){return this->target;}
+        DomainAction const& domain_action(){return this->domain_action_val;}
+    };
+
+    template<typename Action, typename InnerMachine>
     class state_machine{
         static_assert(std::is_base_of_v<base_action, Action>(),"ActionType must inherit from base_action to ensure it has associated state");
 
@@ -39,9 +70,14 @@ namespace raft{
         std::vector<Action> log;
         index_t commitIndex;
         index_t lastApplied;
-        std::optional<leader_state> volatile_leader_state;
-        // I really don't like that templated functions need to go in headers but oh well
+        leader_status leadership_view;
+
+        // implementation details for IO and state machine
+        std::unordered_set<id_t> servers;
+        InnerMachine log_result;
+
         public:
+        // I really don't like that templated functions need to go in headers but oh well
         // might be sensible to trim the arg count down via a struct or class which contains all this and builder pattern
         rpc_ret<bool> append_entries(term_t term, id_t leaderId, index_t prevLogIndex, term_t prevLogTerm, std::vector<Action> const& entries, index_t leaderCommit) noexcept {
             if(term < this->currentTerm) return std::make_pair(std::move(this->currentTerm), false);
@@ -78,9 +114,18 @@ namespace raft{
             }
         }
         
+        // 
         template<typename InputIt>
-        void enqueue_actions(InputIt start, InputIt end){
+        std::variant<std::optional<std::optional<id_t>>, std::size_t> enqueue_actions(InputIt start, InputIt end){
             // TODO: make it so actions are put into the log and whatever state is incremented
+            if(*start.idx != this->log.size()) return this->log.size();
+            if(!this->volatile_leader_state.has_value()) return std::make_optional(this->votedFor);
+            else return 
+        }
+
+        //
+        std::vector<io_action> crank_machine(std::chrono::milliseconds time_passed){
+
         }
     };
 }
