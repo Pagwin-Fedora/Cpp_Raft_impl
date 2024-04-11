@@ -11,6 +11,23 @@ project(raft_cpp_impl
 # setting this so compile_commands.json is generated for clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
+include(FetchContent)
+
+# for CI and other cases
+FetchContent_Declare(
+    Boost
+    GIT_REPOSITORY https://github.com/boostorg/boost.git
+    GIT_TAG boost-1.83.0
+    OVERRIDE_FIND_PACKAGE
+    GIT_SHALLOW true
+)
+FetchContent_Declare(
+    fmt
+    GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+    GIT_TAG 10.2.0
+    OVERRIDE_FIND_PACKAGE
+    GIT_SHALLOW true
+)
 
 find_package(Boost REQUIRED)
 # grabbing fmt lib because atm std::format and std::print support is a bit sketchy
