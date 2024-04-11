@@ -6,7 +6,7 @@ add_library(raft_interface lib.cpp ${HEADER_LIST})
 # We need this directory, and users of our library will need it too
 target_include_directories(raft_interface PUBLIC ../include)
 
-target_link_libraries(raft_interface PRIVATE Boost::boost)
+# target_link_libraries(raft_interface PRIVATE Boost::boost)
 
 target_compile_features(raft_interface PUBLIC cxx_std_17)
 

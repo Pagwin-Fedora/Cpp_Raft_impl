@@ -15,25 +15,22 @@ include(FetchContent)
 
 # for CI and other cases
 FetchContent_Declare(
-    Boost
-    URL https://github.com/boostorg/boost/archive/refs/tags/boost-1.83.0.tar.gz
-    URL_MD5 3018e207fd693a3096131db98977e3d6
-    #GIT_REPOSITORY https://github.com/boostorg/boost.git
-    #GIT_TAG boost-1.83.0
-    #OVERRIDE_FIND_PACKAGE
-    #GIT_SHALLOW true
-)
-FetchContent_Declare(
     fmt
-    URL https://github.com/fmtlib/fmt/archive/refs/tags/10.2.1.tar.gz
-    URL_MD5 dc09168c94f90ea890257995f2c497a5
+    URL https://github.com/fmtlib/fmt/releases/download/10.2.1/fmt-10.2.1.zip
+    URL_MD5 04e266ad52659480d593486a17eed804
+    DOWNLOAD_EXTRACT_TIMESTAMP true
     #GIT_REPOSITORY https://github.com/fmtlib/fmt.git
     #GIT_TAG 10.2.0
-    #OVERRIDE_FIND_PACKAGE
+    OVERRIDE_FIND_PACKAGE
     #GIT_SHALLOW true
+    USES_TERMINAL_DOWNLOAD TRUE 
+    GIT_PROGRESS TRUE   
+    DOWNLOAD_NO_EXTRACT FALSE
 )
+FetchContent_MakeAvailable(fmt)
 
-find_package(Boost REQUIRED)
+# not willing to make this work for now
+#find_package(Boost REQUIRED)
 # grabbing fmt lib because atm std::format and std::print support is a bit sketchy
 find_package(fmt REQUIRED)
 
