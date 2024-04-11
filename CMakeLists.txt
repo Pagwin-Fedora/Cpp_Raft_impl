@@ -16,17 +16,21 @@ include(FetchContent)
 # for CI and other cases
 FetchContent_Declare(
     Boost
-    GIT_REPOSITORY https://github.com/boostorg/boost.git
-    GIT_TAG boost-1.83.0
-    OVERRIDE_FIND_PACKAGE
-    GIT_SHALLOW true
+    URL https://github.com/boostorg/boost/archive/refs/tags/boost-1.83.0.tar.gz
+    URL_MD5 3018e207fd693a3096131db98977e3d6
+    #GIT_REPOSITORY https://github.com/boostorg/boost.git
+    #GIT_TAG boost-1.83.0
+    #OVERRIDE_FIND_PACKAGE
+    #GIT_SHALLOW true
 )
 FetchContent_Declare(
     fmt
-    GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-    GIT_TAG 10.2.0
-    OVERRIDE_FIND_PACKAGE
-    GIT_SHALLOW true
+    URL https://github.com/fmtlib/fmt/archive/refs/tags/10.2.1.tar.gz
+    URL_MD5 dc09168c94f90ea890257995f2c497a5
+    #GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+    #GIT_TAG 10.2.0
+    #OVERRIDE_FIND_PACKAGE
+    #GIT_SHALLOW true
 )
 
 find_package(Boost REQUIRED)
