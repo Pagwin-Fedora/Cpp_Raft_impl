@@ -43,6 +43,10 @@ namespace raft{
         request_vote,
         domain_action
     };
+
+    // Action is subclass of base_action which we can use for various things
+    // DomainAction is a value that's used on state machine inside
+    // io_action is trying to be a tagged union telling the IO impl what to do
     template <typename Action, typename DomainAction>
     class io_action{
         static_assert(std::is_base_of_v<base_action, Action>(),"ActionType must inherit from base_action to ensure it has associated state");
@@ -120,12 +124,13 @@ namespace raft{
             // TODO: make it so actions are put into the log and whatever state is incremented
             if(*start.idx != this->log.size()) return this->log.size();
             if(!this->volatile_leader_state.has_value()) return std::make_optional(this->votedFor);
-            else return 
+            else return std::nullopt;
         }
 
-        //
-        std::vector<io_action> crank_machine(std::chrono::milliseconds time_passed){
-
+        // method that tells the machine how long it's been since the last crank for leadership elections and what not
+        // and allows it to process anything added to the queue in the meantime
+        std::vector<io_action<base_action, char>> crank_machine(std::chrono::milliseconds time_passed){
+            return std::vector<io_action<base_action, char>>();
         }
     };
 }
