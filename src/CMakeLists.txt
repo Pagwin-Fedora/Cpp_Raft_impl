@@ -8,7 +8,7 @@ target_include_directories(raft_interface PUBLIC ../include)
 
 # target_link_libraries(raft_interface PRIVATE Boost::boost)
 
-target_compile_features(raft_interface PUBLIC cxx_std_17)
+target_compile_features(raft_interface PUBLIC cxx_std_20)
 
 # IDEs should put the headers in a nice place
 source_group(
