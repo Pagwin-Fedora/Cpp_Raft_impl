@@ -45,7 +45,7 @@ namespace raft{
     };
 
     // Action is subclass of base_action which we can use for various things
-    // DomainAction is a value that's used on state machine inside
+    // DomainAction is a misc action that isn't related to Raft that needs to be taken by whatever is doing io
     // io_action is trying to be a tagged union telling the IO impl what to do
     template <typename Action, typename DomainAction>
     class io_action{
@@ -118,9 +118,11 @@ namespace raft{
             }
         }
         
-        // 
+        // InputIt is an iterator over values of type Action
         template<typename InputIt>
         std::variant<std::optional<std::optional<id_t>>, std::size_t> enqueue_actions(InputIt start, InputIt end){
+            static_assert(typeid(Action) == typeid(*start), "Iterator must iterate over values of type Action (can't be more specific due to this needing to be a string literal)");
+
             // TODO: make it so actions are put into the log and whatever state is incremented
             if(*start.idx != this->log.size()) return this->log.size();
             if(!this->volatile_leader_state.has_value()) return std::make_optional(this->votedFor);
