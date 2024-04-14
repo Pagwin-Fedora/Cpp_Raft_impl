@@ -11,25 +11,7 @@ project(raft_cpp_impl
 # setting this so compile_commands.json is generated for clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
-#include(FetchContent)
-
-# for CI and other cases
-#FetchContent_Declare(
-#    fmt
-#    URL https://github.com/fmtlib/fmt/releases/download/10.2.1/fmt-10.2.1.zip
-#    URL_MD5 04e266ad52659480d593486a17eed804
-#    DOWNLOAD_EXTRACT_TIMESTAMP true
-#    #GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-#    #GIT_TAG 10.2.0
-#    OVERRIDE_FIND_PACKAGE
-#    #GIT_SHALLOW true
-#    USES_TERMINAL_DOWNLOAD TRUE 
-#    GIT_PROGRESS TRUE   
-#    DOWNLOAD_NO_EXTRACT FALSE
-#)
-#FetchContent_MakeAvailable(fmt)
-
-# not willing to make this work for now
+# boost utils seem useful for this
 find_package(Boost REQUIRED)
 # grabbing fmt lib because atm std::format and std::print support is a bit sketchy
 find_package(fmt REQUIRED)
