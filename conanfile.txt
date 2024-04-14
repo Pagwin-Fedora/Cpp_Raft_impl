@@ -5,4 +5,3 @@ fmt/10.2.1
 [generators]
 CMakeDeps
 CMakeToolchain
-cmake_find_package
