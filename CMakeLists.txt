@@ -13,8 +13,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
 # boost utils seem useful for this
 find_package(Boost REQUIRED)
-# grabbing fmt lib because atm std::format and std::print support is a bit sketchy
-find_package(fmt REQUIRED)
 
 # lib src code
 add_subdirectory(src)
