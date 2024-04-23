@@ -33,10 +33,6 @@ namespace raft{
         candiate,
         leader
     };
-    class leader_status{
-        mode current_state;
-        
-    };
 
     enum io_action_variants{
         send_log,
@@ -61,20 +57,20 @@ namespace raft{
         DomainAction const& domain_action(){return this->domain_action_val;}
     };
 
-    template<typename Action, typename InnerMachine>
+    template<typename Action, typename InnerMachine, typename DomainAction>
     class state_machine{
         static_assert(std::is_base_of_v<base_action, Action>,"ActionType must inherit from base_action to ensure it has associated state");
 
         // normally I don't put _t after type names but id, index and term can easily be var names so clarification seemed useful
 
-        // names correspond to names in paper
         id_t myId;
         std::uint64_t currentTerm;
-        std::optional<id_t> votedFor;
+        // value used to indicate the id of the node we're following, either candidate we voted for or current leader
+        std::optional<id_t> following;
         std::vector<Action> log;
         index_t commitIndex;
         index_t lastApplied;
-        leader_status leadership_view;
+        mode currentState;
 
         // implementation details for IO and state machine
         std::unordered_set<id_t> servers;
@@ -106,7 +102,7 @@ namespace raft{
         rpc_ret<bool> request_votes(term_t term, id_t candidateId, index_t lastLogIndex, term_t lastLogTerm) noexcept{
             if(term < this->currentTerm) return std::make_pair(this->currentTerm, false);
 
-            if(!votedFor.has_value() || votedFor.value() == candidateId){
+            if(!following.has_value() || following.value() == candidateId){
 
                 bool got_vote = lastLogTerm >= std::max_element(this->log.begin(), this->log.end(), [](Action a, Action b){return a.term < b.term;});
 
@@ -123,19 +119,30 @@ namespace raft{
         // InputIt is an iterator over values of type Action
         // Put actions into queue to be committed if we're the leader and return the id of the leader if we aren't
         template<typename InputIt>
-        std::variant<std::optional<std::optional<id_t>>, std::size_t> enqueue_actions(InputIt start, InputIt end){
+        std::optional<id_t> enqueue_actions(InputIt start, InputIt end) noexcept{
             static_assert(typeid(Action) == typeid(*start), "Iterator must iterate over values of type Action (can't be more specific due to this needing to be a string literal)");
-
-            // TODO: make it so actions are put into the log and whatever state is incremented
-            if(*start.idx != this->log.size()) return this->log.size();
-            if(!this->volatile_leader_state.has_value()) return std::make_optional(this->votedFor);
-            else return std::nullopt;
         }
 
         // method that tells the machine how long it's been since the last crank for leadership elections and what not
         // and allows it to process anything added to the queue in the meantime
-        std::vector<io_action<base_action, char>> crank_machine(std::chrono::milliseconds time_passed){
-            return std::vector<io_action<base_action, char>>();
+        std::vector<io_action<Action, DomainAction>> crank_machine(std::chrono::milliseconds time_passed) noexcept{
+            // check if we're due another election, if so become a candidate, increment term and ask for votes (even if current state is leader)
+
+            switch (this->currentState){
+                // if we're a follower we're done I think
+                case mode::follower:
+                    return std::vector<io_action<Action, DomainAction>>();
+                break;
+                // candidates should check if they should restart the election and if so increment term and ask for votes
+                case mode::candiate:
+
+                break;
+                // leaders should check to see if their entire log is committed and if not
+                case mode::leader:
+
+                break;
+            }
+            // unreachable
         }
     };
 }
