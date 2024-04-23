@@ -35,7 +35,7 @@ namespace raft{
     };
     class leader_status{
         mode current_state;
-
+        
     };
 
     enum io_action_variants{
@@ -49,7 +49,7 @@ namespace raft{
     // io_action is trying to be a tagged union telling the IO impl what to do
     template <typename Action, typename DomainAction>
     class io_action{
-        static_assert(std::is_base_of_v<base_action, Action>(),"ActionType must inherit from base_action to ensure it has associated state");
+        static_assert(std::is_base_of_v<base_action, Action>,"ActionType must inherit from base_action to ensure it has associated state");
         io_action_variants variant;
         std::vector<Action> send_log_val;
         DomainAction domain_action_val;
@@ -63,7 +63,7 @@ namespace raft{
 
     template<typename Action, typename InnerMachine>
     class state_machine{
-        static_assert(std::is_base_of_v<base_action, Action>(),"ActionType must inherit from base_action to ensure it has associated state");
+        static_assert(std::is_base_of_v<base_action, Action>,"ActionType must inherit from base_action to ensure it has associated state");
 
         // normally I don't put _t after type names but id, index and term can easily be var names so clarification seemed useful
 
@@ -118,7 +118,10 @@ namespace raft{
             }
         }
         
+
+        
         // InputIt is an iterator over values of type Action
+        // Put actions into queue to be committed if we're the leader and return the id of the leader if we aren't
         template<typename InputIt>
         std::variant<std::optional<std::optional<id_t>>, std::size_t> enqueue_actions(InputIt start, InputIt end){
             static_assert(typeid(Action) == typeid(*start), "Iterator must iterate over values of type Action (can't be more specific due to this needing to be a string literal)");
