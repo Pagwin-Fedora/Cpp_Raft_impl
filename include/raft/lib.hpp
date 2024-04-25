@@ -121,6 +121,7 @@ namespace raft{
         template<typename InputIt>
         std::optional<id_t> enqueue_actions(InputIt start, InputIt end) noexcept{
             static_assert(typeid(Action) == typeid(*start), "Iterator must iterate over values of type Action (can't be more specific due to this needing to be a string literal)");
+            return std::nullopt;
         }
 
         // method that tells the machine how long it's been since the last crank for leadership elections and what not
