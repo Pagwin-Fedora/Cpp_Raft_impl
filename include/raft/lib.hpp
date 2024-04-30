@@ -79,8 +79,9 @@ namespace raft{
         public:
         // I really don't like that templated functions need to go in headers but oh well
         // might be sensible to trim the arg count down via a struct or class which contains all this and builder pattern
-        rpc_ret<bool> append_entries(term_t term, id_t leaderId, index_t prevLogIndex, term_t prevLogTerm, std::vector<Action> const& entries, index_t leaderCommit) noexcept {
+        void append_entries(term_t term, id_t leaderId, index_t prevLogIndex, term_t prevLogTerm, std::vector<Action> const& entries, index_t leaderCommit) noexcept {
             if(term < this->currentTerm) return std::make_pair(std::move(this->currentTerm), false);
+            // keep a list of things we want IO to do when it pings us with crank again and apped this to that
             if(log.size() < prevLogIndex || std::get<0>(log[prevLogIndex]) != prevLogTerm) return std::make_pair(std::move(term), false);
 
             auto first_to_remove = std::find_if(this->log.begin(), this->log.end(), [entries](Action const& myAction){
@@ -96,10 +97,11 @@ namespace raft{
             });
             if(leaderCommit > commitIndex) commitIndex = std::min(leaderCommit, std::max_element(this->log.begin(), this->log.end(), [](Action const& a, Action const& b){return a.idx < b.idx;}));
 
+            // keep a list of things we want IO to do when it pings us with crank again and apped this to that
             return std::make_pair(std::move(term), true);
         }
 
-        rpc_ret<bool> request_votes(term_t term, id_t candidateId, index_t lastLogIndex, term_t lastLogTerm) noexcept{
+        void request_votes(term_t term, id_t candidateId, index_t lastLogIndex, term_t lastLogTerm) noexcept{
             if(term < this->currentTerm) return std::make_pair(this->currentTerm, false);
 
             if(!following.has_value() || following.value() == candidateId){
@@ -107,9 +109,11 @@ namespace raft{
                 bool got_vote = lastLogTerm >= std::max_element(this->log.begin(), this->log.end(), [](Action a, Action b){return a.term < b.term;});
 
                 if(got_vote) this->votedFor.emplace(candidateId);
+                // keep a list of things we want IO to do when it pings us with crank again and apped this to that
                 return std::make_pair(std::move(term), got_vote);
             }
             else {
+                // keep a list of things we want IO to do when it pings us with crank again and apped this to that
                 return std::make_pair(std::move(term), false);
             }
         }
