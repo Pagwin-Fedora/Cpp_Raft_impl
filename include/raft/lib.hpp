@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <deque>
 #include <iterator>
+#include <map>
 #include <optional>
 #include <set>
 #include <tuple>
@@ -20,13 +21,6 @@ namespace raft{
     using index_t = std::uint64_t;
     using term_t = std::uint64_t;
 
-    template <typename return_type> using rpc_ret = std::pair<term_t, return_type>;
-
-    struct leader_state{
-        std::vector<std::uint64_t> nextIndex;
-        std::vector<std::uint64_t> matchIndex;
-    };
-
     // the base class of whatever actions can be applied to the state machine
     class base_action {
         public:
@@ -40,7 +34,7 @@ namespace raft{
     class base_state_machine {
         static_assert(std::is_base_of_v<base_action, Action>);
         // this method should be overriden by the real implementation
-        void apply(std::vector<Action> actions){
+        void apply(Action action){
             //noop for base implementation
         }
         public:
@@ -99,6 +93,7 @@ namespace raft{
         // value used to indicate the id of the node we're following, either candidate we voted for or current leader
         std::optional<id_t> following;
         std::set<id_t> siblings;
+        std::map<id_t, index_t> replicatedIndices;
         std::vector<Action> log;
         index_t commitIndex;
         index_t lastApplied;
@@ -188,7 +183,51 @@ namespace raft{
             }
         }
         
-
+        void ack_rpc(id_t ack_from, io_action_variants action, bool successful){
+            switch(this->currentState){
+                case mode::leader:
+                    // handle case where acknowledging a log appending as well as when being demoted
+                    if(!successful){
+                        // we got demoted, swapping to follower
+                        this->swap_follower();
+                        return;
+                    }
+                    switch(action){
+                        // we don't know anything about domain_actions so noop
+                        case io_action_variants::domain_action:
+                            break;
+                        case io_action_variants::acknowledge_rpc:
+                            //unreachable acknowledghing an acknowledge is nonsense
+                            break;
+                        case io_action_variants::send_log:
+                            //TODO we can send logs with more than 1 entry so handle that correctly
+                            this->replicatedIndices[ack_from]++;
+                        break;
+                        case raft::io_action_variants::request_vote:
+                            // nothing to do they'll find out we're leader in the next regularly scheduled heartbeat
+                        break;
+                    }
+                    break;
+                case mode::candiate:
+                    // handle finding out not being up to date as well as getting another vote
+                    break;
+                case mode::follower:
+                    // ignore any acks they can only be from when we were in a different state
+                    break;
+            }
+        }
+        
+        // change to follower state and remove io_actions which aren't ack
+        void swap_follower(){
+            auto follower_whitelist = [](io_action<Action, DomainAction> a){
+                    return a.variant != io_action_variants::acknowledge_rpc && a.variant != io_action_variants::domain_action;
+            };
+            this->currentState = mode::follower;
+            // convoloted while loop to remove anything that doesn't match follower_whitelist
+            while(std::find_if(this->needed_actions.begin(), this->needed_actions.end(), follower_whitelist) != this->needed_actions.end()){
+                this->needed_actions.erase(std::find_if(this->needed_actions.begin(),this->needed_actions.end(), follower_whitelist));
+            }
+        }
         
         // InputIt is an iterator over values of type Action
         // Put actions into queue to be committed if we're the leader and return the id of the leader if we aren't
@@ -216,8 +255,13 @@ namespace raft{
         // and allows it to process anything added to the queue in the meantime
         // return nullopt when no io needs to be done and return the head of needed_actions if there's anything there
         std::optional<io_action<Action, DomainAction>> crank_machine(std::chrono::milliseconds time_passed) noexcept{
-            // check if we're due another election, if so become a candidate, increment term and ask for votes (even if current state is leader)
 
+            // if we have any log entries that are committed but not applied we should apply them
+            while(lastApplied < commitIndex){
+                this->log_result.apply(this->log[lastApplied+1]);
+                this->lastApplied++;
+            }
+            // check if we're due another election, if so become a candidate, increment term and ask for votes (even if current state is leader)
             if(this->calling_election()){
 
             }
@@ -235,9 +279,15 @@ namespace raft{
                 case mode::candiate:
 
                 break;
-                // leaders should check to see if their entire log is committed and if not
                 case mode::leader:
-
+                    if(this->commitIndex < this->log.size()){
+                        // send out a message to all the siblings about the uncommitted logs
+                    }
+                    else if(time_passed+this->time_since_heartbeat > HEARTBEAT_TIMER){
+                        this->prepend_heartbeat();
+                        this->time_since_heartbeat = 0;
+                    }
+                    
                 break;
             }
             // unreachable
