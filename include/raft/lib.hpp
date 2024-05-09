@@ -108,6 +108,11 @@ namespace raft{
         // implementation details for IO and state machine
         std::unordered_set<id_t> servers;
         InnerMachine log_result;
+
+        // heartbeat and timer
+        std::chrono::milliseconds electionTimeout = std::chrono::milliseconds(rand() % 151 + 150); //timer
+        std::chrono::steady_clock::time_point lastHeartbeat = std::chrono::steady_clock::now(); // beginning time
+
         void ack(io_action_variants act, bool success, id_t target){
             this->needed_actions.push_back(io_action<Action,DomainAction>(
                 io_action_variants::acknowledge_rpc,
@@ -198,6 +203,8 @@ namespace raft{
             return std::nullopt;
         }
         bool calling_election(){
+            return (std::chrono::steady_clock::now() >= (lastHeartbeat + electionTimeout));
+            // return false;
             //TODO put the logic for whether or not we need to call an election here 
         }
         // method that tells the machine how long it's been since the last crank for leadership elections and what not
@@ -221,7 +228,15 @@ namespace raft{
                 break;
                 // candidates should check if they should restart the election and if so increment term and ask for votes
                 case mode::candiate:
-
+                    this->currentTerm++;
+                    this->following = this->myId;
+                    this-> electionTimeout = std::chrono::milliseconds(rand() % 151 + 150);
+                    this->lastHeartbeat = std::chrono::steady_clock::now();
+                    for(id_t s : this->servers){
+                        if(s != this->myId){
+                            request_vote(this->currentTerm, this->myID, log.back().idx, log.back().term, std::chrono::steady_clock::now());  
+                        }
+                    }
                 break;
                 // leaders should check to see if their entire log is committed and if not
                 case mode::leader:
