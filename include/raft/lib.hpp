@@ -48,7 +48,7 @@ namespace raft{
     };
     enum mode{
         follower,
-        candiate,
+        candidate,
         leader
     };
 
@@ -214,7 +214,7 @@ namespace raft{
             // check if we're due another election, if so become a candidate, increment term and ask for votes (even if current state is leader)
 
             if(this->calling_election()){
-
+                this->currentState = mode::candidate; 
             }
             switch (this->currentState){
                 // if we're a follower we're done I think
@@ -227,16 +227,18 @@ namespace raft{
                     }
                 break;
                 // candidates should check if they should restart the election and if so increment term and ask for votes
-                case mode::candiate:
+                case mode::candidate:
                     this->currentTerm++;
                     this->following = this->myId;
-                    this-> electionTimeout = std::chrono::milliseconds(rand() % 151 + 150);
+                    this->electionTimeout = std::chrono::milliseconds(rand() % 151 + 150);
                     this->lastHeartbeat = std::chrono::steady_clock::now();
                     for(id_t s : this->servers){
                         if(s != this->myId){
                             request_vote(this->currentTerm, this->myID, log.back().idx, log.back().term, std::chrono::steady_clock::now());  
                         }
+
                     }
+
                 break;
                 // leaders should check to see if their entire log is committed and if not
                 case mode::leader:
@@ -247,3 +249,68 @@ namespace raft{
         }
     };
 }
+/*
+         ===== Self Notes =====
+        2. ELection timeout - followers time out and start leader selection process
+        
+              
+        // On conversion to candidate, start election:
+        std::chrono::milliseconds electionTimeout = std::chrono::milliseconds(rand() % 151 + 150);
+        std::chrono::steady_clock::time_point lastHeartbeat;
+        std::vector<io_action<Action, DomainAction>> start_election(){
+            //Increment currentTerm
+            this->currentTerm++;
+            //Vote for self
+            this->votedFor.emplace(this->myID);
+            //Reset election timer
+            this-> electionTimeout = std::chrono::milliseconds(rand() % 151 + 150);
+            this->lastHeartbeat = std::chrono::steady_clock::now();
+            //Send RequestVote RPCs to all other servers 
+                // Consider if server is down, we need to resend it
+            std::vector<io_action<Action, DomainAction>> actions;
+            for(id_t s : this->servers){
+                // TODO: Consider is message not recieved by servers
+                if(s != this->myID){
+                    request_vote(this->currentTerm, this->myID, log.back().idx, log.back().term);  
+                    io_action<Action, DomainAction> action;
+                    action.variant = io_action_variants::request_vote;
+                    action.target = s;
+                    actions.push_back(action);
+                }
+            }
+            int majority = 0;
+            for(auto c : actions){
+                if(action.second)
+                    majority++;
+            }
+            //If votes received from majority of servers: become leader
+            if(majority > (this->servers.size()/2) ){
+                this->currentState = mode::leader;
+            }
+            return actions;
+        //• If AppendEntries RPC received from new leader: convert to follower
+        //• If election timeout elapses: start new election
+        }
+
+
+
+
+
+    };
+}
+
+
+
+/*
+               Leader         Follower         Follower
+Client ------>   
+                 Log-------------->------------------->
+                 <-------------Log Recieved
+                Commit
+                -------------->Commit
+                <--------------------------------Log Recieved
+                -------------------------------->Commit
+    <-----------
+
+
+*/
