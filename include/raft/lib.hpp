@@ -6,6 +6,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <sstream>
 #include <type_traits>
 #include <unordered_set>
 #include <utility>
@@ -59,14 +60,38 @@ namespace raft{
         id_t ack_receiver;
         bool successful;
     };
+    class vote_request_state{
+        id_t candidate;
+        id_t target;
+        term_t candidate_term;
+        index_t lastLogIndex;
+        term_t lastLogTerm;
+        public:
+        vote_request_state(
+        id_t candidate,
+        id_t target,
+        term_t candidate_term,
+        index_t lastLogIndex,
+        term_t lastLogTerm):candidate(candidate), target(target), candidate_term(candidate_term), lastLogTerm(lastLogTerm), lastLogIndex(lastLogIndex){}
+        std::string line_separated(){
+            //term_t term, id_t candidateId, index_t lastLogIndex, term_t lastLogTerm
+            std::ostringstream ss;
+            ss << candidate_term << std::endl;
+            ss << candidate << std::endl;
+            ss << lastLogIndex << std::endl;
+            ss << lastLogTerm << std::endl;
+            return ss.str();
+        }
+        id_t send_target(){
+            return this->target;
+        }
+    };
     // Action is subclass of base_action which we can use for various things
     // DomainAction is a misc action that isn't related to Raft that needs to be taken by whatever is doing io
     // io_action is trying to be a tagged union telling the IO impl what to do
     template <typename Action, typename DomainAction>
     class io_action{
         static_assert(std::is_base_of_v<base_action, Action>,"ActionType must inherit from base_action to ensure it has associated state");
-        
-        using vote_request_state = id_t;
         using send_log_state = std::pair<std::vector<Action>, id_t>;
         using content = std::variant<send_log_state, DomainAction, rpc_ack, vote_request_state>;
 
@@ -115,9 +140,9 @@ namespace raft{
         void ack(io_action_variants act, bool success, id_t target){
             this->needed_actions.push_back(io_action<Action,DomainAction>(
                 io_action_variants::acknowledge_rpc,
-                rpc_ack{.my_id = this->myId, .ack_what = act, .successful = success, .ack_receiver = target}),
+                rpc_ack{.ack_what = act, .my_id = this->myId, .ack_receiver = target, .successful = success},
                 this->currentTerm
-            );
+            ));
         }
         void send_log(std::vector<Action> log, id_t target){
             this->needed_actions.push_back(io_action<Action, DomainAction>(
@@ -127,6 +152,7 @@ namespace raft{
             ));
         }
         void request_vote(id_t target){
+
             this->needed_actions.push_back(io_action<Action, DomainAction>(
                 io_action_variants::request_vote,
                 target,
@@ -338,8 +364,44 @@ namespace raft{
                 break;
             }
             // unreachable
+            return std::nullopt;
         }
     };
+    id_t parse_id(std::string const&);
+    std::optional<io_action_variants> parse_action_variant(std::string const&);
+    term_t parse_term(std::string const&);
+    index_t parse_index(std::string const&);
+    std::string display_id(id_t const&);
+    std::string display_term(id_t const&);
+    std::string display_index(id_t const&);
+    std::string display_action_variant(io_action_variants const&);
+    template <typename Action>
+    std::vector<Action> parse_actions(std::string const& line){
+        static_assert(std::is_base_of_v<base_action, Action>);
+        // need to be able to parse actions as well
+        static_assert(std::is_function_v<typeof(Action::parse)>, "need to be able to parse out an action");
+        
+        std::istringstream stream(line);
+        std::vector<Action> acts;
+        do {
+            std::string elem;
+            std::getline(stream, elem, ',');
+            if(elem == "") continue;
+            acts.push_back(Action::parse(elem));
+        }while(!stream.eof());
+    }
+    template <typename Action>
+    std::string display_actions(std::vector<Action> const& acts){
+        static_assert(std::is_base_of_v<base_action, Action>);
+        // need to be able to parse actions as well
+        static_assert(std::is_function_v<typeof(Action::parse)>, "need to be able to parse out an action");
+        
+        std::ostringstream stream;
+        for(auto& act: acts){
+            stream << act.describe() << ",";
+        }
+        return stream.str();
+    }
 }
 /*
          ===== Self Notes =====
