@@ -6,7 +6,6 @@
 #include <map>
 #include <optional>
 #include <set>
-#include <tuple>
 #include <type_traits>
 #include <unordered_set>
 #include <utility>
@@ -38,7 +37,7 @@ namespace raft{
             //noop for base implementation
         }
         public:
-        base_state_machine();
+        base_state_machine(){}
     };
     enum mode{
         follower,
@@ -81,6 +80,7 @@ namespace raft{
         content const& contents(){return this->msg_contents;}
     };
 
+    constexpr std::chrono::milliseconds timeout = std::chrono::milliseconds(500);
     template<typename Action, typename InnerMachine, typename DomainAction>
     class state_machine{
         static_assert(std::is_base_of_v<base_action, Action>,"ActionType must inherit from base_action to ensure it has associated state");
@@ -106,7 +106,8 @@ namespace raft{
 
         // heartbeat and timer
         std::chrono::milliseconds electionTimeout = std::chrono::milliseconds(rand() % 151 + 150); //timer
-        std::chrono::steady_clock::time_point lastHeartbeat = std::chrono::steady_clock::now(); // beginning time
+        std::chrono::milliseconds time_since_heartbeat = std::chrono::milliseconds(0);
+        //std::chrono::milliseconds lastHeartbeat = std::chrono::steady_clock::now(); // beginning time
         int votes_recieved_counter = 0;
 
         void ack(io_action_variants act, bool success, id_t target){
@@ -134,7 +135,7 @@ namespace raft{
         state_machine(std::set<id_t> siblings): siblings(std::move(siblings)){}
         // I really don't like that templated functions need to go in headers but oh well
         // might be sensible to trim the arg count down via a struct or class which contains all this and builder pattern
-        void append_entries(term_t term, id_t leaderId, index_t prevLogIndex, term_t prevLogTerm, std::vector<Action> const& entries, index_t leaderCommit, std::chrono::milliseconds time_passed) noexcept {
+        void append_entries(term_t term, id_t leaderId, index_t prevLogIndex, term_t prevLogTerm, std::vector<Action> const& entries, index_t leaderCommit) noexcept {
             if(term < this->currentTerm){
                 //return std::make_pair(std::move(this->currentTerm), false);
                 this->ack(io_action_variants::send_log, false, leaderId);
@@ -167,7 +168,7 @@ namespace raft{
             );
         }
 
-        void request_votes(term_t term, id_t candidateId, index_t lastLogIndex, term_t lastLogTerm, std::chrono::milliseconds time_passed) noexcept{
+        void request_votes(term_t term, id_t candidateId, index_t lastLogIndex, term_t lastLogTerm) noexcept{
             if(term < this->currentTerm){
                 //return std::make_pair(this->currentTerm, false);
                 this->ack(io_action_variants::request_vote, false, candidateId);
@@ -269,7 +270,7 @@ namespace raft{
             return std::nullopt;
         }
         bool calling_election(){
-            return (std::chrono::steady_clock::now() >= (lastHeartbeat + electionTimeout));
+            return this->time_since_heartbeat >= electionTimeout;
             // return false;
             //TODO put the logic for whether or not we need to call an election here 
         }
@@ -278,6 +279,7 @@ namespace raft{
         // return nullopt when no io needs to be done and return the head of needed_actions if there's anything there
         std::optional<io_action<Action, DomainAction>> crank_machine(std::chrono::milliseconds time_passed) noexcept{
 
+            this->time_since_heartbeat += time_passed;
             // if we have any log entries that are committed but not applied we should apply them
             while(lastApplied < commitIndex){
                 this->log_result.apply(this->log[lastApplied+1]);
@@ -316,9 +318,9 @@ namespace raft{
                     if(this->commitIndex < this->log.size()){
                         // send out a message to all the siblings about the uncommitted logs
                     }
-                    else if(time_passed+this->time_since_heartbeat > HEARTBEAT_TIMER){
+                    else if(this->time_since_heartbeat > timeout){
                         this->prepend_heartbeat();
-                        this->time_since_heartbeat = 0;
+                        this->time_since_heartbeat = std::chrono::milliseconds(0);
                     }
                     
                 break;
