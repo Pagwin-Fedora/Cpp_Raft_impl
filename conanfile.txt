@@ -5,5 +5,8 @@ boost/1.84.0
 CMakeDeps
 CMakeToolchain
 
+[layout]
+cmake_layout
+
 [imports]
 include, *.h -> ./include @ folder=True
