@@ -24,16 +24,18 @@ namespace raft{
     class base_action {
         public:
         // inverse of parse
-        std::string describe();
+        virtual std::string describe();
         // parse a string to get the action desired back
-        static base_action parse(std::string);
+        //base_action parse(std::string);
     };
 
     template<typename Action>
     class base_state_machine {
         static_assert(std::is_base_of_v<base_action, Action>);
+        // need to be able to parse actions as well
+        static_assert(std::is_function_v<typeof(Action::parse)>, "need to be able to parse out an action");
         // this method should be overriden by the real implementation
-        void apply(Action action){
+        virtual void apply(Action action){
             //noop for base implementation
         }
         public:
@@ -269,6 +271,11 @@ namespace raft{
             }
             return std::nullopt;
         }
+        void prepend_heartbeat(){
+            for(auto sibling:siblings){
+                this->needed_actions.push_front(io_action(io_action_variants::send_log,std::make_pair<std::vector<Action>, id_t>({}, sibling),this->currentTerm));
+            }
+        }
         bool calling_election(){
             return this->time_since_heartbeat >= electionTimeout;
             // return false;
@@ -291,10 +298,11 @@ namespace raft{
                 this->currentTerm++;
                 this->following = this->myId;
                 this->electionTimeout = std::chrono::milliseconds(rand() % 151 + 150);
-                this->lastHeartbeat = std::chrono::steady_clock::now();
+                this->time_since_heartbeat = std::chrono::milliseconds(0);
                 this->votes_recieved_counter = 0;
                 for(id_t s : this->servers){
                         if(s != this->myId){
+                            //
                             request_vote(this->currentTerm, this->myID, log.back().idx, log.back().term, std::chrono::steady_clock::now());  
                         }
                     }
