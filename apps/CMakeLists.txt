@@ -5,3 +5,5 @@ add_executable(raft_impl raft_impl.cpp)
 target_compile_features(raft_impl PRIVATE cxx_std_17)
 
 target_link_libraries(raft_impl PRIVATE raft_interface)
+
+target_link_libraries(raft_impl boost::boost)
