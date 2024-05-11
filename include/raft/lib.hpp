@@ -6,7 +6,6 @@
 #include <map>
 #include <optional>
 #include <set>
-#include <tuple>
 #include <type_traits>
 #include <unordered_set>
 #include <utility>
@@ -38,11 +37,11 @@ namespace raft{
             //noop for base implementation
         }
         public:
-        base_state_machine();
+        base_state_machine(){}
     };
     enum mode{
         follower,
-        candiate,
+        candidate,
         leader
     };
 
@@ -81,6 +80,7 @@ namespace raft{
         content const& contents(){return this->msg_contents;}
     };
 
+    constexpr std::chrono::milliseconds timeout = std::chrono::milliseconds(500);
     template<typename Action, typename InnerMachine, typename DomainAction>
     class state_machine{
         static_assert(std::is_base_of_v<base_action, Action>,"ActionType must inherit from base_action to ensure it has associated state");
@@ -103,6 +103,13 @@ namespace raft{
         // implementation details for IO and state machine
         std::unordered_set<id_t> servers;
         InnerMachine log_result;
+
+        // heartbeat and timer
+        std::chrono::milliseconds electionTimeout = std::chrono::milliseconds(rand() % 151 + 150); //timer
+        std::chrono::milliseconds time_since_heartbeat = std::chrono::milliseconds(0);
+        //std::chrono::milliseconds lastHeartbeat = std::chrono::steady_clock::now(); // beginning time
+        int votes_recieved_counter = 0;
+
         void ack(io_action_variants act, bool success, id_t target){
             this->needed_actions.push_back(io_action<Action,DomainAction>(
                 io_action_variants::acknowledge_rpc,
@@ -128,7 +135,7 @@ namespace raft{
         state_machine(std::set<id_t> siblings): siblings(std::move(siblings)){}
         // I really don't like that templated functions need to go in headers but oh well
         // might be sensible to trim the arg count down via a struct or class which contains all this and builder pattern
-        void append_entries(term_t term, id_t leaderId, index_t prevLogIndex, term_t prevLogTerm, std::vector<Action> const& entries, index_t leaderCommit, std::chrono::milliseconds time_passed) noexcept {
+        void append_entries(term_t term, id_t leaderId, index_t prevLogIndex, term_t prevLogTerm, std::vector<Action> const& entries, index_t leaderCommit) noexcept {
             if(term < this->currentTerm){
                 //return std::make_pair(std::move(this->currentTerm), false);
                 this->ack(io_action_variants::send_log, false, leaderId);
@@ -161,7 +168,7 @@ namespace raft{
             );
         }
 
-        void request_votes(term_t term, id_t candidateId, index_t lastLogIndex, term_t lastLogTerm, std::chrono::milliseconds time_passed) noexcept{
+        void request_votes(term_t term, id_t candidateId, index_t lastLogIndex, term_t lastLogTerm) noexcept{
             if(term < this->currentTerm){
                 //return std::make_pair(this->currentTerm, false);
                 this->ack(io_action_variants::request_vote, false, candidateId);
@@ -208,7 +215,21 @@ namespace raft{
                         break;
                     }
                     break;
-                case mode::candiate:
+                case mode::candidate:
+                    switch(action){{
+                        case io_action_variants::request_vote:
+                            if(successful){
+                                this->votes_recieved_counter++;
+                                if(this->votes_recieved_counter > (this->servers.size()/ 2)){
+                                    this->currentState = mode::leader;
+                                    this->following = std::nullopt;
+                                    this->votes_recieved_counter = 0;
+                                }
+                            }
+                        break;
+                        default: 
+                        break;
+                    }}
                     // handle finding out not being up to date as well as getting another vote
                     break;
                 case mode::follower:
@@ -239,7 +260,7 @@ namespace raft{
                     std::move(start, end, std::back_inserter(this->log));
                     return std::nullopt;
                 break;
-                case mode::candiate:
+                case mode::candidate:
                     // ???
                     break;
                 case mode::follower:
@@ -249,6 +270,8 @@ namespace raft{
             return std::nullopt;
         }
         bool calling_election(){
+            return this->time_since_heartbeat >= electionTimeout;
+            // return false;
             //TODO put the logic for whether or not we need to call an election here 
         }
         // method that tells the machine how long it's been since the last crank for leadership elections and what not
@@ -256,6 +279,7 @@ namespace raft{
         // return nullopt when no io needs to be done and return the head of needed_actions if there's anything there
         std::optional<io_action<Action, DomainAction>> crank_machine(std::chrono::milliseconds time_passed) noexcept{
 
+            this->time_since_heartbeat += time_passed;
             // if we have any log entries that are committed but not applied we should apply them
             while(lastApplied < commitIndex){
                 this->log_result.apply(this->log[lastApplied+1]);
@@ -263,7 +287,17 @@ namespace raft{
             }
             // check if we're due another election, if so become a candidate, increment term and ask for votes (even if current state is leader)
             if(this->calling_election()){
-
+                this->currentState = mode::candidate; 
+                this->currentTerm++;
+                this->following = this->myId;
+                this->electionTimeout = std::chrono::milliseconds(rand() % 151 + 150);
+                this->lastHeartbeat = std::chrono::steady_clock::now();
+                this->votes_recieved_counter = 0;
+                for(id_t s : this->servers){
+                        if(s != this->myId){
+                            request_vote(this->currentTerm, this->myID, log.back().idx, log.back().term, std::chrono::steady_clock::now());  
+                        }
+                    }
             }
             switch (this->currentState){
                 // if we're a follower we're done I think
@@ -276,16 +310,17 @@ namespace raft{
                     }
                 break;
                 // candidates should check if they should restart the election and if so increment term and ask for votes
-                case mode::candiate:
-
+                case mode::candidate:
+                   
+                
                 break;
                 case mode::leader:
                     if(this->commitIndex < this->log.size()){
                         // send out a message to all the siblings about the uncommitted logs
                     }
-                    else if(time_passed+this->time_since_heartbeat > HEARTBEAT_TIMER){
+                    else if(this->time_since_heartbeat > timeout){
                         this->prepend_heartbeat();
-                        this->time_since_heartbeat = 0;
+                        this->time_since_heartbeat = std::chrono::milliseconds(0);
                     }
                     
                 break;
@@ -294,3 +329,68 @@ namespace raft{
         }
     };
 }
+/*
+         ===== Self Notes =====
+        2. ELection timeout - followers time out and start leader selection process
+        
+              
+        // On conversion to candidate, start election:
+        std::chrono::milliseconds electionTimeout = std::chrono::milliseconds(rand() % 151 + 150);
+        std::chrono::steady_clock::time_point lastHeartbeat;
+        std::vector<io_action<Action, DomainAction>> start_election(){
+            //Increment currentTerm
+            this->currentTerm++;
+            //Vote for self
+            this->votedFor.emplace(this->myID);
+            //Reset election timer
+            this-> electionTimeout = std::chrono::milliseconds(rand() % 151 + 150);
+            this->lastHeartbeat = std::chrono::steady_clock::now();
+            //Send RequestVote RPCs to all other servers 
+                // Consider if server is down, we need to resend it
+            std::vector<io_action<Action, DomainAction>> actions;
+            for(id_t s : this->servers){
+                // TODO: Consider is message not recieved by servers
+                if(s != this->myID){
+                    request_vote(this->currentTerm, this->myID, log.back().idx, log.back().term);  
+                    io_action<Action, DomainAction> action;
+                    action.variant = io_action_variants::request_vote;
+                    action.target = s;
+                    actions.push_back(action);
+                }
+            }
+            int majority = 0;
+            for(auto c : actions){
+                if(action.second)
+                    majority++;
+            }
+            //If votes received from majority of servers: become leader
+            if(majority > (this->servers.size()/2) ){
+                this->currentState = mode::leader;
+            }
+            return actions;
+        //• If AppendEntries RPC received from new leader: convert to follower
+        //• If election timeout elapses: start new election
+        }
+
+
+
+
+
+    };
+}
+
+
+
+/*
+               Leader         Follower         Follower
+Client ------>   
+                 Log-------------->------------------->
+                 <-------------Log Recieved
+                Commit
+                -------------->Commit
+                <--------------------------------Log Recieved
+                -------------------------------->Commit
+    <-----------
+
+
+*/
