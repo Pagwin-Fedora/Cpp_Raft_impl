@@ -31,3 +31,25 @@ raft::index_t raft::parse_index(std::string const& s){
     return ret;
 
 }
+
+raft::term_t raft::base_action::get_term(){
+    return this->term;
+}
+
+std::string raft::display_id(raft::id_t const& id){
+    std::ostringstream ss;
+    ss << id;
+    return ss.str();
+}
+std::string raft::display_action_variant(raft::io_action_variants const& variant){
+    switch(variant){
+        case raft::io_action_variants::send_log:
+            return "send_log";
+        case raft::io_action_variants::request_vote:
+            return "request_vote";
+        case raft::io_action_variants::domain_action:
+            return "domain_action";
+        case raft::io_action_variants::acknowledge_rpc:
+            return "acknowledge_rpc";
+    }
+}

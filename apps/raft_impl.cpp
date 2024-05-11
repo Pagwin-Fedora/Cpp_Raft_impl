@@ -14,11 +14,11 @@
 
 
 enum actions{add, remove_elem};
-class table_action:raft::base_action{
+class table_action:public raft::base_action{
     public:
     std::size_t idx;
     actions act;
-     std::string describe() override{
+     std::string describe() const override{
          std::string ret;
          switch(act){
              case actions::add:
@@ -48,7 +48,7 @@ class table_action:raft::base_action{
          return ret;
      }
 };
-class table: raft::base_state_machine<table_action>{
+class table: public raft::base_state_machine<table_action>{
     std::vector<std::size_t> elems;
     public:
     table(): raft::base_state_machine<table_action>(){}
@@ -185,6 +185,7 @@ void perform_act(io_t action, std::map<raft::id_t, std::string> const& mapping){
 }
 
 int main(int argc, char *argv[]){
+    std::pair<bool, bool> a = std::make_pair(true, false);
 
     std::vector<std::string> args(argv+1, argv+argc);
     std::string my_socket = args[0];
