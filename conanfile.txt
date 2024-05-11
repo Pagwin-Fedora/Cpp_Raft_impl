@@ -4,3 +4,6 @@ boost/1.84.0
 [generators]
 CMakeDeps
 CMakeToolchain
+
+[imports]
+include, *.h -> ./include @ folder=True
