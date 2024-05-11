@@ -24,7 +24,7 @@ namespace raft{
     class base_action {
         public:
         // inverse of parse
-        virtual std::string describe();
+        virtual std::string describe() = 0;
         // parse a string to get the action desired back
         //base_action parse(std::string);
     };
@@ -272,8 +272,12 @@ namespace raft{
             return std::nullopt;
         }
         void prepend_heartbeat(){
-            for(auto sibling:siblings){
-                this->needed_actions.push_front(io_action(io_action_variants::send_log,std::make_pair<std::vector<Action>, id_t>({}, sibling),this->currentTerm));
+            for(auto& sibling:this->siblings){
+                id_t tmp = sibling;
+                this->needed_actions.push_front(io_action<Action, DomainAction>(
+                    io_action_variants::send_log,
+                    std::make_pair<std::vector<Action>, id_t>(std::vector<Action>(), std::move(tmp)),
+                    this->currentTerm));
             }
         }
         bool calling_election(){
@@ -303,7 +307,7 @@ namespace raft{
                 for(id_t s : this->servers){
                         if(s != this->myId){
                             //
-                            request_vote(this->currentTerm, this->myID, log.back().idx, log.back().term, std::chrono::steady_clock::now());  
+                            //request_vote(this->currentTerm, this->myID, log.back().idx, log.back().term, std::chrono::steady_clock::now());  
                         }
                     }
             }
