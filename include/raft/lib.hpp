@@ -107,6 +107,7 @@ namespace raft{
         // heartbeat and timer
         std::chrono::milliseconds electionTimeout = std::chrono::milliseconds(rand() % 151 + 150); //timer
         std::chrono::steady_clock::time_point lastHeartbeat = std::chrono::steady_clock::now(); // beginning time
+        int votes_recieved_counter = 0;
 
         void ack(io_action_variants act, bool success, id_t target){
             this->needed_actions.push_back(io_action<Action,DomainAction>(
@@ -213,7 +214,21 @@ namespace raft{
                         break;
                     }
                     break;
-                case mode::candiate:
+                case mode::candidate:
+                    switch(action){{
+                        case io_action_variants::request_vote:
+                            if(successful){
+                                this->votes_recieved_counter++;
+                                if(this->votes_recieved_counter > (this->servers.size()/ 2)){
+                                    this->currentState = mode::leader;
+                                    this->following = std::nullopt;
+                                    this->votes_recieved_counter = 0;
+                                }
+                            }
+                        break;
+                        default: 
+                        break;
+                    }}
                     // handle finding out not being up to date as well as getting another vote
                     break;
                 case mode::follower:
@@ -244,7 +259,7 @@ namespace raft{
                     std::move(start, end, std::back_inserter(this->log));
                     return std::nullopt;
                 break;
-                case mode::candiate:
+                case mode::candidate:
                     // ???
                     break;
                 case mode::follower:
@@ -271,6 +286,16 @@ namespace raft{
             // check if we're due another election, if so become a candidate, increment term and ask for votes (even if current state is leader)
             if(this->calling_election()){
                 this->currentState = mode::candidate; 
+                this->currentTerm++;
+                this->following = this->myId;
+                this->electionTimeout = std::chrono::milliseconds(rand() % 151 + 150);
+                this->lastHeartbeat = std::chrono::steady_clock::now();
+                this->votes_recieved_counter = 0;
+                for(id_t s : this->servers){
+                        if(s != this->myId){
+                            request_vote(this->currentTerm, this->myID, log.back().idx, log.back().term, std::chrono::steady_clock::now());  
+                        }
+                    }
             }
             switch (this->currentState){
                 // if we're a follower we're done I think
@@ -284,17 +309,8 @@ namespace raft{
                 break;
                 // candidates should check if they should restart the election and if so increment term and ask for votes
                 case mode::candidate:
-                    this->currentTerm++;
-                    this->following = this->myId;
-                    this->electionTimeout = std::chrono::milliseconds(rand() % 151 + 150);
-                    this->lastHeartbeat = std::chrono::steady_clock::now();
-                    for(id_t s : this->servers){
-                        if(s != this->myId){
-                            request_vote(this->currentTerm, this->myID, log.back().idx, log.back().term, std::chrono::steady_clock::now());  
-                        }
-
-                    }
-
+                   
+                
                 break;
                 case mode::leader:
                     if(this->commitIndex < this->log.size()){
