@@ -241,9 +241,9 @@ void perform_act(io_t action, std::map<raft::id_t, std::string> const& mapping){
     connection.close();
 }
 int main(int argc, char *argv[]){
-
     std::vector<char*> args(argv+1, argv+argc);
     raft::id_t me = raft::parse_id(args[0]);
+    srand(me);
     std::map<raft::id_t, std::string> sibling_sockets = parse_sockets();
     std::set<raft::id_t> siblings;
     std::transform(sibling_sockets.begin(), sibling_sockets.end(), std::inserter(siblings, siblings.begin()), [](auto pair){
