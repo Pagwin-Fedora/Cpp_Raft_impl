@@ -105,8 +105,8 @@ std::map<raft::id_t, std::string> parse_sockets(){
 }
 
 class machine_t: public raft::state_machine<table_action, table, nothing>{
-    machine_t(std::set<raft::id_t> siblings, raft::id_t me):raft::state_machine<table_action, table, nothing>(siblings, me){}
     public:
+    machine_t(std::set<raft::id_t> siblings, raft::id_t me):raft::state_machine<table_action, table, nothing>(siblings, me){}
     bool is_leader(){
         return this->currentState == raft::mode::leader;
     }
@@ -249,7 +249,7 @@ int main(int argc, char *argv[]){
     std::transform(sibling_sockets.begin(), sibling_sockets.end(), std::inserter(siblings, siblings.begin()), [](auto pair){
         return pair.first;
     });
-    std::shared_ptr<machine_t> machine = std::make_shared<machine_t>(siblings);
+    std::shared_ptr<machine_t> machine = std::make_shared<machine_t>(siblings, me);
     auto job = std::async([&sibling_sockets, &me,machine](){
         rpc_listener(sibling_sockets[me], machine);
     });
