@@ -10,6 +10,7 @@ project(raft_cpp_impl
 
 # setting this so compile_commands.json is generated for clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
 
 # boost utils seem useful for this
 find_package(Boost REQUIRED)
