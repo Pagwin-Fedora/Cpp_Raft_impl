@@ -136,37 +136,42 @@ namespace raft{
         // I really don't like that templated functions need to go in headers but oh well
         // might be sensible to trim the arg count down via a struct or class which contains all this and builder pattern
         void append_entries(term_t term, id_t leaderId, index_t prevLogIndex, term_t prevLogTerm, std::vector<Action> const& entries, index_t leaderCommit) noexcept {
-            if(term < this->currentTerm){
-                //return std::make_pair(std::move(this->currentTerm), false);
-                this->ack(io_action_variants::send_log, false, leaderId);
-            }
-            // keep a list of things we want IO to do when it pings us with crank again and apped this to that
-            if(log.size() < prevLogIndex || std::get<0>(log[prevLogIndex]) != prevLogTerm){
-                this->ack(io_action_variants::send_log, false, leaderId);
-                //return std::make_pair(std::move(term), false);
-            }
+            /*
+                if(term < this->currentTerm){
+                    //return std::make_pair(std::move(this->currentTerm), false);
+                    this->ack(io_action_variants::send_log, false, leaderId);
+                }
+                // keep a list of things we want IO to do when it pings us with crank again and apped this to that
+                if(log.size() < prevLogIndex || std::get<0>(log[prevLogIndex]) != prevLogTerm){
+                    this->ack(io_action_variants::send_log, false, leaderId);
+                    //return std::make_pair(std::move(term), false);
+                }
 
-            auto first_to_remove = std::find_if(this->log.begin(), this->log.end(), [entries](Action const& myAction){
-                    return std::any_of(entries.begin(),entries.end(), [myAction](Action const& leaderAction){
-                        return myAction.idx == leaderAction.idx && myAction.term != leaderAction.term;
-                    });
-            });
+                auto first_to_remove = std::find_if(this->log.begin(), this->log.end(), [entries](Action const& myAction){
+                        return std::any_of(entries.begin(),entries.end(), [myAction](Action const& leaderAction){
+                            return myAction.idx == leaderAction.idx && myAction.term != leaderAction.term;
+                        });
+                });
 
-            this->log.erase(first_to_remove, this->log.end());
+                this->log.erase(first_to_remove, this->log.end());
 
-            std::copy_if(entries.begin(), entries.end(), std::back_inserter(this->log), [this](Action& a){
-                return std::none_of(this->log.begin(), this->log.end(), [a](Action& b){return a.idx != b.idx;});
-            });
-            if(leaderCommit > commitIndex) commitIndex = std::min(leaderCommit, std::max_element(this->log.begin(), this->log.end(), [](Action const& a, Action const& b){return a.idx < b.idx;}));
+                std::copy_if(entries.begin(), entries.end(), std::back_inserter(this->log), [this](Action& a){
+                    return std::none_of(this->log.begin(), this->log.end(), [a](Action& b){return a.idx != b.idx;});
+                });
+                if(leaderCommit > commitIndex) commitIndex = std::min(leaderCommit, std::max_element(this->log.begin(), this->log.end(), [](Action const& a, Action const& b){return a.idx < b.idx;}));
 
-            // keep a list of things we want IO to do when it pings us with crank again and apped this to that
-            //return std::make_pair(std::move(term), true);
-            this->needed_actions.push_back(io_action<Action,DomainAction>(
-                io_action_variants::acknowledge_rpc,
-                rpc_ack{.my_id = this->myId, .ack_what = io_action_variants::send_log, .successful = false}),
-                this->currentTerm
-            );
+                // keep a list of things we want IO to do when it pings us with crank again and apped this to that
+                //return std::make_pair(std::move(term), true);
+                this->needed_actions.push_back(io_action<Action,DomainAction>(
+                    io_action_variants::acknowledge_rpc,
+                    rpc_ack{.my_id = this->myId, .ack_what = io_action_variants::send_log, .successful = false}),
+                    this->currentTerm
+                );
+            */
+
+        
         }
+
 
         void request_votes(term_t term, id_t candidateId, index_t lastLogIndex, term_t lastLogTerm) noexcept{
             if(term < this->currentTerm){
@@ -294,10 +299,11 @@ namespace raft{
                 this->lastHeartbeat = std::chrono::steady_clock::now();
                 this->votes_recieved_counter = 0;
                 for(id_t s : this->servers){
-                        if(s != this->myId){          
-                            request_vote(this->currentTerm, this->myID, log.back().idx, log.back().term, std::chrono::steady_clock::now());  
-                        }
+                    if(s != this->myId){          
+                        request_vote(this->currentTerm, this->myID, log.back().idx, log.back().term, std::chrono::steady_clock::now());  
+                        s.needed_actions.push_back()
                     }
+                }
             }
             switch (this->currentState){
                 // if we're a follower we're done I think
