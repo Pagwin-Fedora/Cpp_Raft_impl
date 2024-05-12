@@ -99,6 +99,7 @@ namespace raft{
         index_t prevLogIndex;
         term_t prevLogTerm;
         index_t committed;
+        id_t target;
     };
     // Action is subclass of base_action which we can use for various things
     // DomainAction is a misc action that isn't related to Raft that needs to be taken by whatever is doing io
@@ -159,10 +160,10 @@ namespace raft{
                 this->currentTerm
             ));
         }
-        void send_log(std::vector<Action> log, id_t target){
+        void send_log(send_log_state<Action> args){
             this->needed_actions.push_back(io_action<Action, DomainAction>(
                 io_action_variants::send_log,
-                std::make_pair(std::move(log), target),
+                args,
                 this->currentTerm
             ));
         }
@@ -231,7 +232,7 @@ namespace raft{
             }
         }
         
-        void ack_rpc(id_t ack_from, io_action_variants action, bool successful){
+        void ack_rpc(id_t ack_from, io_action_variants action, bool successful, term_t ack_from_term){
             switch(this->currentState){
                 case mode::leader:
                     // handle case where acknowledging a log appending as well as when being demoted
@@ -241,6 +242,8 @@ namespace raft{
                         return;
                     }
                     switch(action){
+                        case io_action_variants::request_vote:
+                            break;
                         // we don't know anything about domain_actions so noop
                         case io_action_variants::domain_action:
                             break;
@@ -248,12 +251,32 @@ namespace raft{
                             //unreachable acknowledging an acknowledge is nonsense
                             break;
                         case io_action_variants::send_log:
-                            //TODO we can send logs with more than 1 entry so handle that correctly
+                            if(!successful){
+                                if(ack_from_term > this->currentTerm){
+                                    this->currentTerm = ack_from_term;
+                                    this->currentState = mode::follower;
+                                    this->following = std::nullopt;
+                                }
+                                else {
+                                    index_t i = 0;
+                                    for(auto& action:this->log){
+                                        send_log_state<Action> s;
+                                        s.leaderId = this->myId;
+                                        s.target = ack_from;
+                                        s.actions = {action};
+                                        s.committed = this->commitIndex;
+                                        s.leaderTerm = this->currentTerm;
+                                        s.prevLogTerm = action.get_term();
+                                        s.prevLogIndex = i;
+                                        i++;
+                                        this->send_log(s);
+                                    }
+                                }
+                            }
                             this->replicatedIndices[ack_from]++;
-                            this->commitIndex = *std::min_element(this->replicatedIndices.begin(), this->replicatedIndices.end());
-                        break;
-                        case raft::io_action_variants::request_vote:
-                            // nothing to do they'll find out we're leader in the next regularly scheduled heartbeat
+                            std::set<index_t> indices;
+                            std::transform(this->replicatedIndices.begin(),replicatedIndices.end(),std::inserter(indices, indices.begin()),[](auto pair){return pair.second;});
+                            this->commitIndex = std::max(this->commitIndex,*std::min_element(indices.begin(),indices.end()));
                         break;
                     }
                     break;
@@ -313,10 +336,18 @@ namespace raft{
         }
         void prepend_heartbeat(){
             for(auto& sibling:this->siblings){
+                send_log_state<Action> s;
+                s.target = sibling;
+                s.actions = {};
+                s.leaderId = this->myId;
+                s.committed = this->commitIndex;
+                s.leaderTerm = this->currentTerm;
+                s.prevLogTerm = this->log.back().get_term();
+                s.prevLogIndex = this->log.size()-1;
                 id_t tmp = sibling;
                 this->needed_actions.push_front(io_action<Action, DomainAction>(
                     io_action_variants::send_log,
-                    std::make_pair<std::vector<Action>, id_t>(std::vector<Action>(), std::move(tmp)),
+                    s,
                     this->currentTerm));
             }
         }
@@ -368,7 +399,15 @@ namespace raft{
                     if(this->commitIndex < this->log.size()){
                         std::vector<Action> send = {log[commitIndex]};
                         for(auto sibling:siblings){
-                            this->send_log();
+                            send_log_state<Action> s;
+                            s.leaderId = this->myId;
+                            s.target = sibling;
+                            s.actions = send;
+                            s.committed = this->commitIndex;
+                            s.leaderTerm = this->currentTerm;
+                            s.prevLogTerm = s.actions[0].get_term();
+                            s.prevLogIndex = commitIndex;
+                            this->send_log(s);
                         }
                         // send out a message to all the siblings about the uncommitted logs
                     }

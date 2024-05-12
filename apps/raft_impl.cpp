@@ -51,6 +51,12 @@ class table_action:public raft::base_action{
          i >> ret.idx;
          return ret;
      }
+     friend bool operator==(table_action const& lhs, table_action const& rhs){
+        return lhs.idx == rhs.idx && lhs.act == rhs.act;
+     }
+     friend bool operator!=(table_action const& lhs, table_action const& rhs){
+        return !(lhs == rhs);
+     }
 };
 class table: public raft::base_state_machine<table_action>{
     std::vector<std::size_t> elems;
@@ -139,8 +145,8 @@ void rpc_listener(std::string unix_socket, std::shared_ptr<machine_t> machine, s
             raft::id_t ack_from = raft::parse_id(args[0]);
             raft::io_action_variants ack_of = raft::parse_action_variant(args[1]).value();
             bool successful = args[2] == "success";
-
-            machine->ack_rpc(ack_from, ack_of, successful);
+            raft::term_t acked_term = raft::parse_term(args[3]);
+            machine->ack_rpc(ack_from, ack_of, successful, acked_term);
         }
         else if(rpc_name == "append_entries"){
             raft::term_t callee_term = raft::parse_term(args[0]);
@@ -172,11 +178,14 @@ void perform_act(io_t action, std::map<raft::id_t, std::string> const& mapping){
     //switch statement is problematic for unknown but silly reasons
     #define CHECK(x) if(action.get_variant() == x)
     CHECK(io_action_variants::send_log){
-        auto info = std::get<std::pair<std::vector<table_action>,raft::id_t>>(action.contents());
-        auto log = std::get<0>(info);
-        target = std::get<1>(info);
+        auto info = std::get<raft::send_log_state<table_action>>(action.contents());
+        //auto log = std::get<0>(info);
+        //target = std::get<1>(info);
+        auto log = info.actions;
+        target = info.target;
+
         ss << "1\n";
-        ss << raft::display_actions(log);
+        ss << raft::display_actions(log) << std::endl;
     }
     else CHECK(io_action_variants::request_vote){
         auto info = std::get<raft::vote_request_state>(action.contents());
@@ -219,6 +228,11 @@ int main(int argc, char *argv[]){
     std::shared_ptr<std::mutex> machine_mutex;
     auto job = std::async([&sibling_sockets, &me,machine, machine_mutex](){
         rpc_listener(sibling_sockets[me], machine, machine_mutex);
+    });
+    auto job2 = std::async([machine, machine_mutex](){
+            std::string line;
+            std::getline(std::cin, line);
+
     });
     using std::chrono::steady_clock;
     std::chrono::time_point prev_time = steady_clock::now();
