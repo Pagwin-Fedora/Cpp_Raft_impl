@@ -126,6 +126,7 @@ namespace raft{
     constexpr std::chrono::milliseconds timeout = std::chrono::milliseconds(500);
     template<typename Action, typename InnerMachine, typename DomainAction>
     class state_machine{
+        protected:
         static_assert(std::is_base_of_v<base_action, Action>,"ActionType must inherit from base_action to ensure it has associated state");
         static_assert(std::is_base_of_v<base_state_machine<Action>, InnerMachine>, "The Inner State Machine needs to inherit from base_state_machine because C++ doesn't have interfaces");
 
@@ -176,7 +177,7 @@ namespace raft{
             ));
         }
         public:
-        state_machine(std::set<id_t> siblings): siblings(std::move(siblings)){}
+        state_machine(std::set<id_t> siblings, id_t me): siblings(std::move(siblings)), myId(me){}
         // I really don't like that templated functions need to go in headers but oh well
         // might be sensible to trim the arg count down via a struct or class which contains all this and builder pattern
         void append_entries(term_t term, id_t leaderId, index_t prevLogIndex, term_t prevLogTerm, std::vector<Action> const& entries, index_t leaderCommit) noexcept {

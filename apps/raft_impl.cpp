@@ -10,6 +10,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <thread>
 #include <vector>
 #include <string>
 #include <sstream>
@@ -17,6 +18,7 @@
 #include <raft/lib.hpp>
 
 
+std::mutex machine_mutex;
 enum actions{add, remove_elem};
 class table_action:public raft::base_action{
     public:
@@ -89,6 +91,7 @@ std::map<raft::id_t, std::string> parse_sockets(){
     do {
         std::string line;
         std::getline(in,line);
+        if(line == "") break;
         std::istringstream line_stream(line);
         raft::id_t id;
         line_stream >> id;
@@ -101,11 +104,35 @@ std::map<raft::id_t, std::string> parse_sockets(){
     return ret;
 }
 
-using machine_t = raft::state_machine<table_action, table, nothing>;
+class machine_t: public raft::state_machine<table_action, table, nothing>{
+    machine_t(std::set<raft::id_t> siblings, raft::id_t me):raft::state_machine<table_action, table, nothing>(siblings, me){}
+    public:
+    bool is_leader(){
+        return this->currentState == raft::mode::leader;
+    }
+    raft::id_t gimme(){
+        return this->myId;
+    }
+    std::string display_log(){
+        return raft::display_actions(this->log);
+    }
+    void add_idx(std::size_t num){
+        table_action t;
+        t.act = actions::add;
+        t.idx = num;
+        this->log.push_back(t);
+    }
+    void rem_idx(std::size_t num){
+        table_action t;
+        t.act = actions::remove_elem;
+        t.idx = num;
+        this->log.push_back(t);
+    }
+};
 using io_t = raft::io_action<table_action, nothing>;
 
 [[noreturn]]
-void rpc_listener(std::string unix_socket, std::shared_ptr<machine_t> machine, std::shared_ptr<std::mutex> machine_mutex){
+void rpc_listener(std::string unix_socket, std::shared_ptr<machine_t> machine){
     // boost socket stuff copied from https://stackoverflow.com/a/37081979
     using boost::asio::local::stream_protocol;
 
@@ -140,7 +167,7 @@ void rpc_listener(std::string unix_socket, std::shared_ptr<machine_t> machine, s
         }
         connection.close();
         //unlock after if/else chain
-        machine_mutex->lock();
+        machine_mutex.lock();
         if(rpc_name == "acknowledge_rpc"){
             raft::id_t ack_from = raft::parse_id(args[0]);
             raft::io_action_variants ack_of = raft::parse_action_variant(args[1]).value();
@@ -166,7 +193,7 @@ void rpc_listener(std::string unix_socket, std::shared_ptr<machine_t> machine, s
             
             machine->request_votes(requester_term, requester, lastLogIndex, lastLogTerm);
         }
-        machine_mutex->unlock();
+        machine_mutex.unlock();
     }
 }
 
@@ -213,11 +240,9 @@ void perform_act(io_t action, std::map<raft::id_t, std::string> const& mapping){
     connection.send(buf);
     connection.close();
 }
-
 int main(int argc, char *argv[]){
-    std::pair<bool, bool> a = std::make_pair(true, false);
 
-    std::vector<std::string> args(argv+1, argv+argc);
+    std::vector<char*> args(argv+1, argv+argc);
     raft::id_t me = raft::parse_id(args[0]);
     std::map<raft::id_t, std::string> sibling_sockets = parse_sockets();
     std::set<raft::id_t> siblings;
@@ -225,14 +250,37 @@ int main(int argc, char *argv[]){
         return pair.first;
     });
     std::shared_ptr<machine_t> machine = std::make_shared<machine_t>(siblings);
-    std::shared_ptr<std::mutex> machine_mutex;
-    auto job = std::async([&sibling_sockets, &me,machine, machine_mutex](){
-        rpc_listener(sibling_sockets[me], machine, machine_mutex);
+    auto job = std::async([&sibling_sockets, &me,machine](){
+        rpc_listener(sibling_sockets[me], machine);
     });
-    auto job2 = std::async([machine, machine_mutex](){
+    auto job2 = std::async([machine](){
             std::string line;
             std::getline(std::cin, line);
-
+            machine_mutex.lock();
+            if(line[0] == '+'){
+                std::istringstream ss(line.substr(1));
+                std::size_t idx;
+                ss >> idx;
+                machine->add_idx(idx);
+            }
+            else if(line[0] == '-'){
+                std::istringstream ss(line.substr(1));
+                std::size_t idx;
+                ss >> idx;
+                machine->rem_idx(idx);
+            }
+            machine_mutex.unlock();
+    });
+    auto job3 = std::async([machine](){
+        while(true){
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            machine_mutex.lock();
+            if(machine->is_leader()){
+                std::cout << machine->gimme() << " is the leader\n";
+            }
+            std::cout << machine->display_log() << std::endl;
+            machine_mutex.unlock();
+        }
     });
     using std::chrono::steady_clock;
     std::chrono::time_point prev_time = steady_clock::now();
@@ -240,12 +288,16 @@ int main(int argc, char *argv[]){
         std::chrono::time_point now_time = steady_clock::now();
 
         auto diff = now_time-prev_time;
-        machine_mutex->lock();
+        machine_mutex.lock();
         auto act = machine->crank_machine(std::chrono::duration_cast<std::chrono::milliseconds>(diff));
-        machine_mutex->unlock();
+        machine_mutex.unlock();
 
         prev_time = now_time;
-        if(!act.has_value()) continue;
+        if(!act.has_value()){
+            // yield when we have nothing to do
+            std::this_thread::yield();
+            continue;
+        }
         
         perform_act(act.value(), sibling_sockets);
     }
