@@ -35,6 +35,9 @@ raft::index_t raft::parse_index(std::string const& s){
 raft::term_t raft::base_action::get_term(){
     return this->term;
 }
+void raft::base_action::set_term(raft::term_t t){
+    this->term = t;
+}
 
 std::string raft::display_id(raft::id_t const& id){
     std::ostringstream ss;

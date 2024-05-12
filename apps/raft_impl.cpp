@@ -1,8 +1,12 @@
+#include <algorithm>
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/local/stream_protocol.hpp>
 #include <chrono>
 #include <cstddef>
+#include <fstream>
+#include <future>
 #include <iostream>
+#include <iterator>
 #include <memory>
 #include <mutex>
 #include <set>
@@ -70,15 +74,32 @@ class table: public raft::base_state_machine<table_action>{
 };
 class nothing{};
 
+constexpr char file_location[] = "sockets";
 std::map<raft::id_t, std::string> parse_sockets(){
-    return std::map<raft::id_t, std::string>();
+
+    std::map<raft::id_t, std::string> ret;
+    std::ifstream in(file_location);
+
+    do {
+        std::string line;
+        std::getline(in,line);
+        std::istringstream line_stream(line);
+        raft::id_t id;
+        line_stream >> id;
+        std::string sock;
+        line_stream >> sock;
+        ret[id] = sock;
+
+    }while(!in.eof());
+
+    return ret;
 }
 
 using machine_t = raft::state_machine<table_action, table, nothing>;
 using io_t = raft::io_action<table_action, nothing>;
 
 [[noreturn]]
-void rpc_listener(std::string unix_socket, std::shared_ptr<machine_t> machine, std::mutex machine_mutex){
+void rpc_listener(std::string unix_socket, std::shared_ptr<machine_t> machine, std::shared_ptr<std::mutex> machine_mutex){
     // boost socket stuff copied from https://stackoverflow.com/a/37081979
     using boost::asio::local::stream_protocol;
 
@@ -113,7 +134,7 @@ void rpc_listener(std::string unix_socket, std::shared_ptr<machine_t> machine, s
         }
         connection.close();
         //unlock after if/else chain
-        machine_mutex.lock();
+        machine_mutex->lock();
         if(rpc_name == "acknowledge_rpc"){
             raft::id_t ack_from = raft::parse_id(args[0]);
             raft::io_action_variants ack_of = raft::parse_action_variant(args[1]).value();
@@ -139,7 +160,7 @@ void rpc_listener(std::string unix_socket, std::shared_ptr<machine_t> machine, s
             
             machine->request_votes(requester_term, requester, lastLogIndex, lastLogTerm);
         }
-        machine_mutex.unlock();
+        machine_mutex->unlock();
     }
 }
 
@@ -188,20 +209,26 @@ int main(int argc, char *argv[]){
     std::pair<bool, bool> a = std::make_pair(true, false);
 
     std::vector<std::string> args(argv+1, argv+argc);
-    std::string my_socket = args[0];
+    raft::id_t me = raft::parse_id(args[0]);
     std::map<raft::id_t, std::string> sibling_sockets = parse_sockets();
-    std::set<raft::id_t> siblings = {1,2,3};
+    std::set<raft::id_t> siblings;
+    std::transform(sibling_sockets.begin(), sibling_sockets.end(), std::inserter(siblings, siblings.begin()), [](auto pair){
+        return pair.first;
+    });
     std::shared_ptr<machine_t> machine = std::make_shared<machine_t>(siblings);
-    std::mutex machine_mutex;
+    std::shared_ptr<std::mutex> machine_mutex;
+    auto job = std::async([&sibling_sockets, &me,machine, machine_mutex](){
+        rpc_listener(sibling_sockets[me], machine, machine_mutex);
+    });
     using std::chrono::steady_clock;
     std::chrono::time_point prev_time = steady_clock::now();
     while(true){
         std::chrono::time_point now_time = steady_clock::now();
 
         auto diff = now_time-prev_time;
-        machine_mutex.lock();
+        machine_mutex->lock();
         auto act = machine->crank_machine(std::chrono::duration_cast<std::chrono::milliseconds>(diff));
-        machine_mutex.unlock();
+        machine_mutex->unlock();
 
         prev_time = now_time;
         if(!act.has_value()) continue;
