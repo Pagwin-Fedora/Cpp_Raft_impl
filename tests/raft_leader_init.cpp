@@ -6,7 +6,7 @@ using namespace raft::testing;
 
 int main(void){
     //fake a machine with 2 siblings and id 1
-    min_machine m1({1,2,3}, 1);
+    min_machine<true> m1({1,2,3}, 1);
 
     // tell the machine that 1 second has passed it should promote to candidate and go ask for votes
     auto act = m1.crank_machine(std::chrono::milliseconds(1000));

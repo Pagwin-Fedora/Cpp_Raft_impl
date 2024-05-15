@@ -193,7 +193,7 @@ namespace raft{
                 this->ack(io_action_variants::send_log,false, leaderId);
                 return;
             }
-            if(this->log[prevLogIndex].get_term() != prevLogTerm){
+            if(this->log.size() != 0 && this->log[prevLogIndex].get_term() != prevLogTerm){
                 this->ack(io_action_variants::send_log, false, leaderId);
             }
             this->following.emplace(leaderId);
@@ -227,7 +227,9 @@ namespace raft{
 
             if(!following.has_value() || following.value() == candidateId){
 
-                bool got_vote = lastLogTerm >= (*std::max_element(this->log.begin(), this->log.end(), [](Action a, Action b){return a.get_term() < b.get_term();})).get_term();
+                
+                bool got_vote = this->log.size() == 0 ||
+                    (lastLogTerm >= (*std::max_element(this->log.begin(), this->log.end(), [](Action a, Action b){return a.get_term() < b.get_term();})).get_term());
 
                 if(got_vote){
                     this->following.emplace(candidateId);
