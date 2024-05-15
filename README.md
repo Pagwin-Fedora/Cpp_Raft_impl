@@ -9,7 +9,7 @@ At time of writing this is an incomplete implementation of the [Raft](https://ra
 
 ## How to build/run
 
-1. `cmake --B build`
+1. `cmake -B build`
 2. `cmake --build build`
 3. the executable can be found in `./build/apps/raft_impl` and is run with `$exe_location $server_id` where server id is one of the numbers in the `sockets` file which needs to be in your current working directory when you run the executable
 
