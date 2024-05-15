@@ -1,7 +1,15 @@
-add_executable(raft_init raft_init.cpp)
+add_executable(raft_leader_init raft_leader_init.cpp)
 
-target_compile_features(raft_init PRIVATE cxx_std_17)
+target_compile_features(raft_leader_init PRIVATE cxx_std_17)
 
-target_link_libraries(raft_init PRIVATE raft_interface)
+target_link_libraries(raft_leader_init PRIVATE raft_interface)
 
-add_test(NAME initial_election COMMAND raft_init)
+add_test(NAME initial_election_leader COMMAND raft_leader_init)
+
+add_executable(raft_follower_init raft_follower_init.cpp)
+
+target_compile_features(raft_follower_init PRIVATE cxx_std_17)
+
+target_link_libraries(raft_follower_init PRIVATE raft_interface)
+
+add_test(NAME initial_election_follower COMMAND raft_follower_init)

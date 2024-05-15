@@ -22,6 +22,9 @@ namespace raft{
             raft::mode what_mode(){
                 return this->currentState;
             }
+            std::deque<raft::io_action<min_action, nothing>>const& queue(){
+                return this->needed_actions;
+            }
         };
     }
 }
