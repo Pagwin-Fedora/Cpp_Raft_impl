@@ -55,4 +55,5 @@ std::string raft::display_action_variant(raft::io_action_variants const& variant
         case raft::io_action_variants::acknowledge_rpc:
             return "acknowledge_rpc";
     }
+    return "(error in display_action_variant)";
 }

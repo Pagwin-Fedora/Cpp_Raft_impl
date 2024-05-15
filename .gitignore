@@ -13,3 +13,4 @@ src/cmake_install.cmake
 build.ninja
 build
 .cache
+Testing

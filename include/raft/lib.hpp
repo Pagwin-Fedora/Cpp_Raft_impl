@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cstdint>
 #include <deque>
+#include <iostream>
 #include <iterator>
 #include <map>
 #include <optional>
@@ -12,6 +13,9 @@
 #include <utility>
 #include <variant>
 #include <vector>
+
+#ifndef RAFT_LIB_SYMBOL
+#define RAFT_LIB_SYMBOL
 
 // on page 4 there's a 1 page reference sheet https://raft.github.io/raft.pdf
 // TODO: implement everything under Rules for servers
@@ -107,8 +111,7 @@ namespace raft{
     template <typename Action, typename DomainAction>
     class io_action{
         static_assert(std::is_base_of_v<base_action, Action>,"ActionType must inherit from base_action to ensure it has associated state");
-        using send_log_state = send_log_state<Action>;
-        using content = std::variant<send_log_state, DomainAction, rpc_ack, vote_request_state>;
+        using content = std::variant<send_log_state<Action>, DomainAction, rpc_ack, vote_request_state>;
 
         term_t sent_at;
         io_action_variants variant;
@@ -177,7 +180,7 @@ namespace raft{
             ));
         }
         public:
-        state_machine(std::set<id_t> siblings, id_t me): siblings(std::move(siblings)), myId(me){}
+        state_machine(std::set<id_t> siblings, id_t me): siblings(std::move(siblings)), myId(me), currentTerm(0){}
         // I really don't like that templated functions need to go in headers but oh well
         // might be sensible to trim the arg count down via a struct or class which contains all this and builder pattern
         void append_entries(term_t term, id_t leaderId, index_t prevLogIndex, term_t prevLogTerm, std::vector<Action> const& entries, index_t leaderCommit) noexcept {
@@ -221,7 +224,10 @@ namespace raft{
 
                 bool got_vote = lastLogTerm >= (*std::max_element(this->log.begin(), this->log.end(), [](Action a, Action b){return a.get_term() < b.get_term();})).get_term();
 
-                if(got_vote) this->following.emplace(candidateId);
+                if(got_vote){
+                    this->following.emplace(candidateId);
+                    this->currentTerm = term;
+                }
                 // keep a list of things we want IO to do when it pings us with crank again and apped this to that
                 this->ack(io_action_variants::request_vote, got_vote, candidateId);
                 //return std::make_pair(std::move(term), got_vote);
@@ -362,7 +368,9 @@ namespace raft{
         // return nullopt when no io needs to be done and return the head of needed_actions if there's anything there
         std::optional<io_action<Action, DomainAction>> crank_machine(std::chrono::milliseconds time_passed) noexcept{
 
+
             this->time_since_heartbeat += time_passed;
+
             // if we have any log entries that are committed but not applied we should apply them
             while(lastApplied < commitIndex){
                 this->log_result.apply(this->log[lastApplied+1]);
@@ -445,6 +453,7 @@ namespace raft{
             if(elem == "") continue;
             acts.push_back(Action::parse(elem));
         }while(!stream.eof());
+        return acts;
     }
     template <typename Action>
     std::string display_actions(std::vector<Action> const& acts){
@@ -524,3 +533,4 @@ Client ------>
 
 
 */
+#endif

@@ -21,3 +21,7 @@ add_subdirectory(src)
 # app source code
 add_subdirectory(apps)
 
+# app tests
+enable_testing()
+add_subdirectory(tests)
+

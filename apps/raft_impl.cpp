@@ -114,6 +114,7 @@ class machine_t: public raft::state_machine<table_action, table, nothing>{
         return this->myId;
     }
     std::string display_log(){
+        if(this->log.size() == 0) return "(empty log)";
         return raft::display_actions(this->log);
     }
     void add_idx(std::size_t num){
@@ -298,7 +299,7 @@ int main(int argc, char *argv[]){
             std::this_thread::yield();
             continue;
         }
-        
+        std::cout << raft::display_action_variant(act.value().get_variant()) << std::endl;
         perform_act(act.value(), sibling_sockets);
     }
     return 0;
