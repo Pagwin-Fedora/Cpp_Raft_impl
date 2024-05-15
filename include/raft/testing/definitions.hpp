@@ -7,6 +7,7 @@ namespace raft{
         class nothing{};
         class min_action: public raft::base_action{
             public:
+            min_action():raft::base_action(){}
             std::string describe() const override{
                 return "";
             }

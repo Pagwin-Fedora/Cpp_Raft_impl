@@ -9,7 +9,9 @@ int main(void){
     min_machine m1({1,2,3}, 1);
     min_machine m2({1,2,3}, 2);
     min_machine m3({1,2,3}, 3);
+
     auto act = m1.crank_machine(std::chrono::milliseconds(1000));
+
     if(m1.what_mode() != raft::candidate){
         std::cerr << "didn't promote to candidate within a second" << std::endl;
         std::exit(1);
