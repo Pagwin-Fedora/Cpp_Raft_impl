@@ -12,8 +12,8 @@ project(raft_cpp_impl
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 
-# boost utils seem useful for this
-find_package(Boost REQUIRED)
+find_package(Boost)
+find_package(fmt)
 
 # lib src code
 add_subdirectory(src)
