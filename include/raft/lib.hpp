@@ -367,8 +367,6 @@ namespace raft{
         }
         bool calling_election(){
             return this->time_since_heartbeat >= electionTimeout;
-            // return false;
-            //TODO put the logic for whether or not we need to call an election here 
         }
         // method that tells the machine how long it's been since the last crank for leadership elections and what not
         // and allows it to process anything added to the queue in the meantime
