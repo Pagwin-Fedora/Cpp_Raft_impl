@@ -69,6 +69,7 @@ namespace raft{
         bool successful;
     };
     class vote_request_state{
+        public:
         id_t candidate;
         id_t target;
         term_t candidate_term;

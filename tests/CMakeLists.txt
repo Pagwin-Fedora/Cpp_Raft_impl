@@ -13,3 +13,11 @@ target_compile_features(raft_follower_init PRIVATE cxx_std_17)
 target_link_libraries(raft_follower_init PRIVATE raft_interface)
 
 add_test(NAME initial_election_follower COMMAND raft_follower_init)
+
+add_executable(raft_complete_init raft_complete_init.cpp)
+
+target_compile_features(raft_complete_init PRIVATE cxx_std_17)
+
+target_link_libraries(raft_complete_init PRIVATE raft_interface)
+
+add_test(NAME full_raft_initialization_test COMMAND raft_complete_init)
