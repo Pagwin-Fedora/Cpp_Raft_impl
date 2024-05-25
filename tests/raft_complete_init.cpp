@@ -37,12 +37,19 @@ int main(void){
     bool success = false;
     for(int i = 0;i<2000;i++){
         std::vector<raft::io_action<min_action<true>,nothing>> actions;
+        std::vector<raft::id_t> ids;
         // batching cranks and handle_rpc calls to kinda simulate latency
         for(auto& machine:machines){
             auto crank = machine.crank_machine(std::chrono::milliseconds(1));
-            if(crank.has_value()) actions.push_back(crank.value());
+            if(crank.has_value()){
+                actions.push_back(crank.value());
+                ids.push_back(machine.me());
+            }
         }
+        int k = 0;
         for(auto& action:actions){
+            std::cerr <<ids[k]<< " to " << action.get_target() << " " << raft::display_action_variant(action.get_variant()) << std::endl;
+            k++;
             handle_rpc(machines, action);
         }
 
@@ -53,7 +60,7 @@ int main(void){
         if(success) break;
     }
     if(!success){
-        std::cerr << "Failed to elect a leader in 2 simulated seconds" << std::endl;
+        std::cerr << "Failed to elect a leader in 2 simulated seconds on round " << counter << std::endl;
         std::exit(1);
     }
 

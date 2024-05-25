@@ -34,6 +34,9 @@ namespace raft{
             std::deque<raft::io_action<min_action<all_actions_equal>, nothing>>const& queue(){
                 return this->needed_actions;
             }
+            raft::id_t me(){
+                return this->myId;
+            }
         };
     }
 }
