@@ -47,7 +47,7 @@ int main(void){
         }
 
         success = std::any_of(machines.begin(), machines.end(), [](auto machine){
-            return machine.what_state() == raft::mode::leader;
+            return machine.what_mode() == raft::mode::leader;
         });
 
         if(success) break;

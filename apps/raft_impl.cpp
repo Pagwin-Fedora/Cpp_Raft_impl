@@ -238,7 +238,7 @@ void perform_act(io_t action, std::map<raft::id_t, std::string> const& mapping){
     boost::asio::io_service io_service;
     stream_protocol::socket connection(io_service);
     connection.connect(mapping.at(target));
-    fmt::println(std::cerr,"sending message to {}",mapping.at(target));
+    //fmt::println(std::cerr,"sending message to {}",mapping.at(target));
     boost::asio::const_buffer buf(msg.c_str(), msg.size());
     connection.send(buf);
     connection.close();
@@ -279,9 +279,9 @@ int main(int argc, char *argv[]){
             std::this_thread::sleep_for(std::chrono::seconds(1));
             machine_mutex.lock();
             if(machine->is_leader()){
-                fmt::println(std::cerr, "{} is the leader", machine->gimme());
+                //fmt::println(std::cerr, "{} is the leader", machine->gimme());
             }
-            fmt::println("{}", machine->display_log());
+            //fmt::println("{}", machine->display_log());
             machine_mutex.unlock();
         }
     });
@@ -304,7 +304,7 @@ int main(int argc, char *argv[]){
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             continue;
         }
-        fmt::println(std::cerr, "{}", raft::display_action_variant(act.value().get_variant()));
+        //fmt::println(std::cerr, "{}", raft::display_action_variant(act.value().get_variant()));
         perform_act(act.value(), sibling_sockets);
     }
     return 0;
