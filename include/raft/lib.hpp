@@ -396,7 +396,7 @@ namespace raft{
                             if(this->log.size() > 0){
                                 log_term = this->log.back().get_term();
                             }
-                            this->request_vote(vote_request_state(this->myId,s,this->currentTerm,this->log.size()-1,log_term));
+                            this->request_vote(vote_request_state(this->myId,s,this->currentTerm,this->log.size()!=0?this->log.size()-1:0,log_term));
                         }
                 }
             }

@@ -6,8 +6,7 @@
 using namespace raft::testing;
 
 void handle_rpc(std::vector<min_machine<true>>& machines, raft::io_action<min_action<true>,nothing> action){
-    auto target = machines[action.get_target()-1];
-
+    auto& target = machines[action.get_target()-1];
     #define CHECK(x) if(action.get_variant() == (x))
     CHECK(raft::io_action_variants::send_log){
         auto specific = std::get<raft::send_log_state<min_action<true>>>(action.contents());

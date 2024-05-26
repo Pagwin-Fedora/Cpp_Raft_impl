@@ -14,3 +14,4 @@ build.ninja
 build
 .cache
 Testing
+debug
