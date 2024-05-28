@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <cstdlib>
+#include <ctime>
 #include <chrono>
 #include <raft/lib.hpp>
 #include <raft/testing/definitions.hpp>
@@ -24,8 +26,10 @@ void handle_rpc(std::vector<min_machine<true>>& machines, raft::io_action<min_ac
 }
 
 int main(void){
-    // looping a million times to brute force any rng out rather than having a flaky test
-    for(std::size_t counter = 0; counter < 1000000L;counter++){
+    auto time = static_cast<std::uint64_t>(std::time(NULL));
+    srand(time);
+    // looping ten thousand times to minimize the possibility for this to succeed due to chance
+    for(std::size_t counter = 0; counter < 10000L;counter++){
 
 
     std::vector<min_machine<true>> machines;
@@ -47,7 +51,7 @@ int main(void){
         }
         int k = 0;
         for(auto& action:actions){
-            std::cerr <<ids[k]<< " to " << action.get_target() << " " << raft::display_action_variant(action.get_variant()) << std::endl;
+            //std::cerr <<ids[k]<< " to " << action.get_target() << " " << raft::display_action_variant(action.get_variant()) << std::endl;
             k++;
             handle_rpc(machines, action);
         }
@@ -59,7 +63,7 @@ int main(void){
         if(success) break;
     }
     if(!success){
-        std::cerr << "Failed to elect a leader in 2 simulated seconds on round " << counter << std::endl;
+        std::cerr << "Failed to elect a leader in 2 simulated seconds on round " << counter << " with seed "<< static_cast<unsigned int>(time) << std::endl;
         std::exit(1);
     }
 

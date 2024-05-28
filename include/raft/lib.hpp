@@ -389,7 +389,7 @@ namespace raft{
                 this->following = this->myId;
                 this->electionTimeout = std::chrono::milliseconds(rand() % 151 + 150);
                 this->time_since_heartbeat = std::chrono::milliseconds(0);
-                this->votes_recieved_counter = 0;
+                this->votes_recieved_counter = 1;
                 for(id_t s : this->siblings){
                         if(s != this->myId){
                             term_t log_term = 0;
