@@ -13,6 +13,7 @@
 #include <utility>
 #include <variant>
 #include <vector>
+#include <raft/rng.hpp>
 
 #ifndef RAFT_LIB_SYMBOL
 #define RAFT_LIB_SYMBOL
@@ -136,7 +137,7 @@ namespace raft{
     };
 
     constexpr std::chrono::milliseconds timeout = std::chrono::milliseconds(500);
-    template<typename Action, typename InnerMachine, typename DomainAction>
+    template<typename Action, typename InnerMachine, typename DomainAction, typename rand_t = raft::crand<0>>
     class state_machine{
         protected:
         static_assert(std::is_base_of_v<base_action, Action>,"ActionType must inherit from base_action to ensure it has associated state");
@@ -156,7 +157,9 @@ namespace raft{
         mode currentState;
         std::deque<io_action<Action, DomainAction>> needed_actions;
         InnerMachine log_result;
+        rand_t rand;
 
+        // TODO: redo this in constructor
         // heartbeat and timer
         std::chrono::milliseconds electionTimeout = std::chrono::milliseconds(rand() % 151 + 150); //timer
         std::chrono::milliseconds time_since_heartbeat = std::chrono::milliseconds(0);
@@ -225,7 +228,7 @@ namespace raft{
                 //return std::make_pair(this->currentTerm, false);
                 this->ack(io_action_variants::request_vote, false, candidateId);
             }
-
+            if(term > this->currentTerm) std::erase_if(this->needed_actions.begin(), this->needed_actions.end(),)
             if(!following.has_value() || following.value() == candidateId){
 
                 
