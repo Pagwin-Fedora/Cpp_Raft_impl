@@ -228,7 +228,10 @@ namespace raft{
                 //return std::make_pair(this->currentTerm, false);
                 this->ack(io_action_variants::request_vote, false, candidateId);
             }
-            if(term > this->currentTerm) std::erase_if(this->needed_actions.begin(), this->needed_actions.end(),)
+            if(term > this->currentTerm) std::remove_if(this->needed_actions.begin(), this->needed_actions.end(), [](auto action){
+                return false;
+            });
+
             if(!following.has_value() || following.value() == candidateId){
 
                 
