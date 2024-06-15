@@ -1,7 +1,7 @@
 # based heavily on https://gitlab.com/CLIUtils/modern-cmake/-/blob/master/examples/extended-project/src/CMakeLists.txt
 set(HEADER_LIST "${raft_cpp_impl_SOURCE_DIR}/include/raft/lib.hpp")
 
-add_library(raft_interface lib.cpp ${HEADER_LIST})
+add_library(raft_interface lib.cpp rng.cpp ${HEADER_LIST})
 
 # We need this directory, and users of our library will need it too
 target_include_directories(raft_interface PUBLIC ../include)

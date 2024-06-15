@@ -7,7 +7,8 @@
 
 using namespace raft::testing;
 
-void handle_rpc(std::vector<min_machine<true>>& machines, raft::io_action<min_action<true>,nothing> action){
+using rng = raft::singular_crand<1716942716>;
+void handle_rpc(std::vector<min_machine<true, rng>>& machines, raft::io_action<min_action<true>,nothing> action){
     auto& target = machines[action.get_target()-1];
     #define CHECK(x) if(action.get_variant() == (x))
     CHECK(raft::io_action_variants::send_log){
@@ -26,15 +27,17 @@ void handle_rpc(std::vector<min_machine<true>>& machines, raft::io_action<min_ac
 }
 
 int main(void){
-    srand(1716942716);
     // looping ten thousand times to minimize the possibility for this to succeed due to chance
     for(std::size_t counter = 0; counter < 10000L;counter++){
     bool flag = counter == 3644;
+    if(flag){
 
-    std::vector<min_machine<true>> machines;
+        break;
+    }
+    std::vector<min_machine<true, rng>> machines;
     std::set<raft::id_t> ids = {1,2,3,4,5};
     for(auto id:ids){
-        machines.push_back(min_machine<true>(ids,id));
+        machines.push_back(min_machine<true,rng>(ids,id));
     }
     bool success = false;
     for(int i = 0;i<2000;i++){

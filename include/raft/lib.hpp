@@ -142,6 +142,7 @@ namespace raft{
         protected:
         static_assert(std::is_base_of_v<base_action, Action>,"ActionType must inherit from base_action to ensure it has associated state");
         static_assert(std::is_base_of_v<base_state_machine<Action>, InnerMachine>, "The Inner State Machine needs to inherit from base_state_machine because C++ doesn't have interfaces");
+        static_assert(std::is_base_of_v<raft::base_rand, rand_t>,"The rng provider doesn't implement base_rand");
 
         // normally I don't put _t after type names but id, index and term can easily be var names so clarification seemed useful
 
@@ -189,7 +190,7 @@ namespace raft{
             ));
         }
         public:
-        state_machine(std::set<id_t> siblings, id_t me): siblings(std::move(siblings)), myId(me), currentTerm(0), lastApplied(0), commitIndex(0), currentState(raft::mode::follower), log(), replicatedIndices(), following(std::nullopt), needed_actions(){}
+        state_machine(std::set<id_t> siblings, id_t me, rand_t rand = {}): siblings(std::move(siblings)), myId(me), currentTerm(0), lastApplied(0), commitIndex(0), currentState(raft::mode::follower), log(), replicatedIndices(), following(std::nullopt), needed_actions(), rand(rand){}
         // I really don't like that templated functions need to go in headers but oh well
         // might be sensible to trim the arg count down via a struct or class which contains all this and builder pattern
         void append_entries(term_t term, id_t leaderId, index_t prevLogIndex, term_t prevLogTerm, std::vector<Action> const& entries, index_t leaderCommit) noexcept {

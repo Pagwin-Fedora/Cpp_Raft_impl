@@ -2,6 +2,7 @@
 #define RAFT_RNG
 #include <cstdlib>
 #include <ctime>
+#include <optional>
 namespace raft{
     class base_rand{
         public:
@@ -15,13 +16,7 @@ namespace raft{
     class crand:public base_rand{
         public:
         crand():base_rand(){
-            if constexpr (seed == 0){
-                auto now = std::time(NULL);
-                std::srand(static_cast<unsigned int>(now));
-            }
-            else{
-                std::srand(seed);
-            }
+            std::srand(seed);
         }
         int operator()() override{
             return std::rand();
@@ -29,6 +24,18 @@ namespace raft{
         int seed_val(){
             return seed;
         }
+    };
+
+    //specialize for case where seed is runtime value
+    template<>
+    class crand<0>:public base_rand{
+        private:
+        int rseed;
+        public:
+        crand();
+        crand(std::optional<unsigned int>);
+        int operator()() override;
+        int seed_val();
     };
 }
 #endif
