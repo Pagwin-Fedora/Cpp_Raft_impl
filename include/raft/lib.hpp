@@ -26,6 +26,9 @@ namespace raft{
     using index_t = std::uint64_t;
     using term_t = std::uint64_t;
 
+    // convenience
+    using namespace std::chrono_literals;
+
     // the base class of whatever actions can be applied to the state machine
     class base_action {
         term_t term;
@@ -135,8 +138,7 @@ namespace raft{
         term_t const& get_term(){return this->sent_at;}
         content const& contents(){return this->msg_contents;}
     };
-
-    constexpr std::chrono::milliseconds timeout = std::chrono::milliseconds(500);
+    constexpr std::chrono::milliseconds timeout = 500ms;
     template<typename Action, typename InnerMachine, typename DomainAction, typename rand_t = raft::crand<0>>
     class state_machine{
         protected:
@@ -163,7 +165,7 @@ namespace raft{
         // TODO: redo this in constructor
         // heartbeat and timer
         std::chrono::milliseconds electionTimeout = std::chrono::milliseconds(rand() % 151 + 150); //timer
-        std::chrono::milliseconds time_since_heartbeat = std::chrono::milliseconds(0);
+        std::chrono::milliseconds time_since_heartbeat = 0ms;
         //std::chrono::milliseconds lastHeartbeat = std::chrono::steady_clock::now(); // beginning time
         int votes_recieved_counter = 0;
 
@@ -395,7 +397,7 @@ namespace raft{
                 this->currentTerm++;
                 this->following = this->myId;
                 this->electionTimeout = std::chrono::milliseconds(rand() % 151 + 150);
-                this->time_since_heartbeat = std::chrono::milliseconds(0);
+                this->time_since_heartbeat = 0ms;
                 this->votes_recieved_counter = 1;
                 for(id_t s : this->siblings){
                         if(s != this->myId){
@@ -433,7 +435,7 @@ namespace raft{
                     }
                     else if(this->time_since_heartbeat > timeout){
                         this->prepend_heartbeat();
-                        this->time_since_heartbeat = std::chrono::milliseconds(0);
+                        this->time_since_heartbeat = 0ms;
                     }
                     
                 break;
