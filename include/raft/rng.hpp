@@ -4,7 +4,8 @@
 #include <ctime>
 #include <optional>
 namespace raft{
-    class base_rand{
+    
+    class [[deprecated("Moving to stdlib named requirements RandomNumberEngine")]] base_rand{
         public:
         base_rand() = default;
         // needs to have a definition so... https://xkcd.com/221/
@@ -13,7 +14,7 @@ namespace raft{
     };
     // use the C stdlib rand function for rng, use 0 in template for current time as seed
     template<int seed>
-    class crand:public base_rand{
+    class [[deprecated("Move to rng that isn't based on libc rand")]] crand:public base_rand{
         public:
         crand():base_rand(){
             std::srand(seed);
