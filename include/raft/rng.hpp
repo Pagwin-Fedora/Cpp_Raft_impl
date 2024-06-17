@@ -4,7 +4,33 @@
 #include <ctime>
 #include <optional>
 namespace raft{
-    
+    template <typename T> struct is_random_number_engine{
+        constexpr bool operator()(){
+            auto a = T{};
+            auto b = T{};
+
+            if(a != b) return false;
+            auto c = a;
+            if(a != c) return false;
+            //ignoring seed_seq requirements because it's a pain and only doing equality check
+            auto d = T{3};
+            auto e = T{3};
+            if(d != e) return false;
+
+            if(a() != b()) return false;
+            if(a() != b()) return false;
+
+            if((a!=b) != !(a==b)) return false;
+
+            //ignoring stream requirements
+            
+            return true;
+        }
+        constexpr operator bool(){
+            return (*this)();
+        }
+    };
+    template <typename T> bool is_random_number_engine_v = is_random_number_engine<T>()();
     class [[deprecated("Moving to stdlib named requirements RandomNumberEngine")]] base_rand{
         public:
         base_rand() = default;
