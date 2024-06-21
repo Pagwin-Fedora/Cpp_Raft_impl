@@ -2,7 +2,7 @@
 
 add_executable(raft_impl raft_impl.cpp)
 
-target_compile_features(raft_impl PUBLIC cxx_std_17)
+target_compile_features(raft_impl PUBLIC cxx_std_20)
 
 target_link_libraries(raft_impl PUBLIC raft_interface)
 

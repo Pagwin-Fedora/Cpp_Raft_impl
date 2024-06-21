@@ -1,5 +1,8 @@
-#include "raft/rng.hpp"
+#ifndef RAFT_TESTING_DEF
+#define RAFT_TESTING_DEF
+
 #include <raft/lib.hpp>
+#include <random>
 #include <set>
 #include <string>
 
@@ -25,10 +28,10 @@ namespace raft{
         };
         template<bool all_actions_equal>
         using min_state_machine = raft::base_state_machine<min_action<all_actions_equal>>;
-        template<bool all_actions_equal, typename rand_t=raft::crand<0>>
+        template<bool all_actions_equal, typename rand_t=std::mt19937_64>
         class min_machine: public raft::state_machine<min_action<all_actions_equal>, min_state_machine<all_actions_equal>, nothing, rand_t> {
             public:
-            min_machine(std::set<raft::id_t> other, raft::id_t me): raft::state_machine<min_action<all_actions_equal>, min_state_machine<all_actions_equal>, nothing, rand_t>(other, me){}
+            min_machine(std::set<raft::id_t> other, raft::id_t me, rand_t rand = {}): raft::state_machine<min_action<all_actions_equal>, min_state_machine<all_actions_equal>, nothing, rand_t>(other, me, rand){}
             raft::mode what_mode(){
                 return this->currentState;
             }
@@ -40,20 +43,5 @@ namespace raft{
             }
         };
     }
-    template<int seed>
-    class singular_crand:public base_rand{
-        static bool init;
-        public:
-        singular_crand():base_rand(){
-            if(!init){
-                init = true;
-                std::srand(seed);
-            }
-        }
-        int operator()() override{
-            return std::rand();
-        }
-    };
-    template<int seed>
-    bool singular_crand<seed>::init = false;
 }
+#endif

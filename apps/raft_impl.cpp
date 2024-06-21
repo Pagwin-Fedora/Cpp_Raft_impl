@@ -9,11 +9,13 @@
 #include <iterator>
 #include <memory>
 #include <mutex>
+#include <random>
 #include <set>
 #include <thread>
 #include <vector>
 #include <string>
 #include <sstream>
+#include <ranges>
 #include <boost/asio.hpp>
 #include <fmt/ostream.h>
 #include <fmt/format.h>
@@ -106,9 +108,12 @@ std::map<raft::id_t, std::string> parse_sockets(){
     return ret;
 }
 
+
+// global was the easiest solution, divided by 31 so extra numbers are generated in case I'm missing something
+auto seq = raft::make_seed_seq(19937/31);
 class machine_t: public raft::state_machine<table_action, table, nothing>{
     public:
-    machine_t(std::set<raft::id_t> siblings, raft::id_t me):raft::state_machine<table_action, table, nothing>(siblings, me){}
+    machine_t(std::set<raft::id_t> siblings, raft::id_t me):raft::state_machine<table_action, table, nothing>(siblings, me, std::mt19937_64(seq)){}
     bool is_leader(){
         return this->currentState == raft::mode::leader;
     }
